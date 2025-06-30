@@ -7,28 +7,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.rktec_middleware.viewmodel.RfidViewModel
 
 @Composable
-fun TelaPrincipalScreen() {
-    val leituras = remember { mutableStateListOf("EPC123", "EPC456", "EPC789") }
-
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp)) {
-
-        Text("Etiquetas Lidas", style = MaterialTheme.typography.headlineSmall)
-
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(leituras) { epc ->
-                Text(text = epc, modifier = Modifier.padding(8.dp))
+fun TelaPrincipalScreen(viewModel: RfidViewModel) {
+    val tags by viewModel.tagList.collectAsState()
+    Column {
+        Row {
+            Button(onClick = { viewModel.startReading() }) {
+                Text("Iniciar Leitura")
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = { viewModel.stopReading() }) {
+                Text("Parar")
             }
         }
-
-        Button(
-            onClick = { /* depois colocamos a importação da planilha aqui */ },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Importar Planilha")
+        LazyColumn {
+            items(tags) { tag ->
+                Text(text = tag.epc, modifier = Modifier.padding(8.dp))
+            }
         }
     }
 }
+
