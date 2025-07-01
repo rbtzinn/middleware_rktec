@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.rktec_middlware"
+    namespace = "com.example.rktec_middleware"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.rktec_middlware"
+        applicationId = "com.example.rktec_middleware"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -36,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        viewBinding = true
     }
 }
 
@@ -51,6 +52,12 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose.android)
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.cardview:cardview:1.0.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.cardview:cardview:1.0.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

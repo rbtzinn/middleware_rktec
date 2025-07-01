@@ -1,4 +1,4 @@
-package com.example.rktec_middlware.ui.theme
+package com.example.rktec_middleware.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
