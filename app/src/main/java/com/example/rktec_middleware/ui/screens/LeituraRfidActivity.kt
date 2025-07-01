@@ -22,6 +22,7 @@ import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Brush
 
 
 @Composable
@@ -49,7 +50,11 @@ fun TelaLeituraRfid(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(90.dp)
-                .background(Color(0xFF4A90E2))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF4A90E2), Color(0xFF174D86))
+                    )
+                )
         ) {
             IconButton(
                 onClick = { isDialogVoltarAberto = true },

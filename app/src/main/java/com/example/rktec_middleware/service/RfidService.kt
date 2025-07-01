@@ -1,7 +1,7 @@
 package com.example.rktec_middleware.service
 
 import android.content.Context
-import com.example.rktec_middleware.model.EpcTag
+import com.example.rktec_middleware.data.model.EpcTag
 import kotlinx.coroutines.flow.MutableSharedFlow
 import com.pda.rfid.IAsynchronousMessage
 import com.pda.rfid.uhf.UHFReader

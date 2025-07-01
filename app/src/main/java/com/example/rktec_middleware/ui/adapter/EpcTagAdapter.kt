@@ -5,7 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.rktec_middleware.model.EpcTag
+import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.R
 
 class EpcTagAdapter(private val tags: List<EpcTag>) : RecyclerView.Adapter<EpcTagAdapter.ViewHolder>() {

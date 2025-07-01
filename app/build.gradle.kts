@@ -2,7 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-kapt")
 }
+
 
 android {
     namespace = "com.example.rktec_middleware"
@@ -14,7 +16,6 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,7 +42,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -56,20 +56,21 @@ dependencies {
     implementation("androidx.cardview:cardview:1.0.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("androidx.cardview:cardview:1.0.0")
-    implementation ("androidx.navigation:navigation-compose:2.7.7")
-    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
-    implementation ("com.google.accompanist:accompanist-pager:0.34.0")
-    implementation ("com.google.accompanist:accompanist-placeholder-material:0.34.0")
-    implementation ("com.google.accompanist:accompanist-swiperefresh:0.34.0")
-    implementation ("com.airbnb.android:lottie-compose:6.4.0")
-    implementation ("io.coil-kt:coil-compose:2.5.0")
-    implementation ("com.jakewharton.timber:timber:5.0.1")
-    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation ("androidx.compose.material:material-icons-extended:1.5.4")
-    implementation(libs.androidx.room.common.jvm)
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
+    implementation("com.google.accompanist:accompanist-pager:0.34.0")
+    implementation("com.google.accompanist:accompanist-placeholder-material:0.34.0")
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.34.0")
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("com.jakewharton.timber:timber:5.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
+    // ROOM (AQUI ESTÁ CERTO!)
+    implementation("androidx.room:room-runtime:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

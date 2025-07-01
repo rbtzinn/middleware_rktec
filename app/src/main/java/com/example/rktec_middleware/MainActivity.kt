@@ -12,6 +12,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
+import com.example.rktec_middleware.ui.screens.TelaInventario
+import com.example.rktec_middleware.ui.screens.TelaLeituraInventario
+import com.example.rktec_middleware.data.db.AppDatabase
+
+
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: RfidViewModel
@@ -25,19 +30,32 @@ class MainActivity : ComponentActivity() {
             RfidViewModelFactory(applicationContext)
         ).get(RfidViewModel::class.java)
 
+        val appDatabase = AppDatabase.getInstance(applicationContext)
+
         setContent {
             var telaAtual by remember { mutableStateOf("menu") }
+
             when (telaAtual) {
                 "menu" -> TelaPrincipal(
-                    onColetaClick = { telaAtual = "leitura" }
+                    onColetaClick = { telaAtual = "leitura" },
+                    onInventarioClick = { telaAtual = "inventario" }
                 )
                 "leitura" -> TelaLeituraRfid(
                     viewModel = viewModel,
                     onVoltar = { telaAtual = "menu" }
                 )
+                "inventario" -> TelaInventario(
+                    onVoltar = { telaAtual = "menu" },
+                    onIniciarLeituraInventario = { telaAtual = "leituraInventario" }
+                )
+                "leituraInventario" -> TelaLeituraInventario(
+                    onVoltar = { telaAtual = "menu" },
+                    banco = appDatabase
+                )
             }
         }
     }
+
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == 139 && !lendo) {

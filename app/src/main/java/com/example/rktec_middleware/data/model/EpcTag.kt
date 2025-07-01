@@ -1,4 +1,4 @@
-package com.example.rktec_middleware.model
+package com.example.rktec_middleware.data.model
 
 data class EpcTag(
     val epc: String,

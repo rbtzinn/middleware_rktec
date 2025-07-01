@@ -16,7 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 
 @Composable
 fun TelaPrincipal(
-    onColetaClick: () -> Unit
+    onColetaClick: () -> Unit,
+    onInventarioClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -65,6 +66,19 @@ fun TelaPrincipal(
                     Text("Coleta", fontSize = 26.sp, color = Color.White)
                 }
             }
+            item {
+                Button(
+                    onClick = { onInventarioClick() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
+                ) {
+                    Text("Inventário", fontSize = 26.sp, color = Color.White)
+                }
+            }
+
             // Depois você pode adicionar outros botões aqui:
             /*
             item {

@@ -3,7 +3,7 @@ package com.example.rktec_middleware.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.rktec_middleware.model.EpcTag
+import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.service.RfidService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
