@@ -22,6 +22,14 @@ class RfidViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun adicionarTagFake() {
+        _tagList.value = (_tagList.value + EpcTag("EPC_TESTE_${System.currentTimeMillis()}")).distinctBy { it.epc }
+    }
+
+    fun limparTags() {
+        _tagList.value = emptyList()
+    }
+
     fun startReading() = service.iniciarLeitura()
     fun stopReading() = service.pararLeitura()
     fun setPotencia(potencia: Int) = service.setPotencia(potencia)

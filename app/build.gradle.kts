@@ -58,6 +58,18 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.cardview:cardview:1.0.0")
+    implementation ("androidx.navigation:navigation-compose:2.7.7")
+    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
+    implementation ("com.google.accompanist:accompanist-pager:0.34.0")
+    implementation ("com.google.accompanist:accompanist-placeholder-material:0.34.0")
+    implementation ("com.google.accompanist:accompanist-swiperefresh:0.34.0")
+    implementation ("com.airbnb.android:lottie-compose:6.4.0")
+    implementation ("io.coil-kt:coil-compose:2.5.0")
+    implementation ("com.jakewharton.timber:timber:5.0.1")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation ("androidx.compose.material:material-icons-extended:1.5.4")
+    implementation(libs.androidx.room.common.jvm)
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -2,44 +2,47 @@ package com.example.rktec_middleware
 
 import android.os.Bundle
 import android.view.KeyEvent
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.rktec_middleware.model.EpcTag
-import com.example.rktec_middleware.ui.screens.EpcTagAdapter
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.remember
+import androidx.lifecycle.ViewModelProvider
+import com.example.rktec_middleware.ui.screens.TelaLeituraRfid
+import com.example.rktec_middleware.viewmodel.RfidViewModel
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
 
-class MainActivity : AppCompatActivity() {
-
-    private val tags = mutableListOf<EpcTag>()
-    private lateinit var adapter: EpcTagAdapter
-    private lateinit var tvStatusLeitura: TextView
-    private lateinit var tvContadorTags: TextView
-    private lateinit var tvNenhumaTag: TextView
-
+class MainActivity : ComponentActivity() {
+    private lateinit var viewModel: RfidViewModel
     private var lendo = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_leitura_rfid)
 
-        tvStatusLeitura = findViewById(R.id.tvStatusLeitura)
-        tvContadorTags = findViewById(R.id.tvContadorTags)
-        tvNenhumaTag = findViewById(R.id.tvNenhumaTag)
+        viewModel = ViewModelProvider(
+            this,
+            RfidViewModelFactory(applicationContext)
+        ).get(RfidViewModel::class.java)
 
-        val recyclerView = findViewById<RecyclerView>(R.id.rvTagsLidas)
-        adapter = EpcTagAdapter(tags)
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = adapter
-
-        atualizarLista()
+        setContent {
+            var telaAtual by remember { mutableStateOf("menu") }
+            when (telaAtual) {
+                "menu" -> TelaPrincipal(
+                    onColetaClick = { telaAtual = "leitura" }
+                )
+                "leitura" -> TelaLeituraRfid(
+                    viewModel = viewModel,
+                    onVoltar = { telaAtual = "menu" }
+                )
+            }
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == 139 && !lendo) {
             lendo = true
-            tvStatusLeitura.text = "Leitura sendo efetuada..."
-            // aqui chama seu service: rfidService.iniciarLeitura()
+            viewModel.startReading()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -48,22 +51,10 @@ class MainActivity : AppCompatActivity() {
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == 139 && lendo) {
             lendo = false
-            tvStatusLeitura.text = "Pressione o gatilho para ler"
-            // aqui chama seu service: rfidService.pararLeitura()
+            viewModel.stopReading()
             return true
         }
         return super.onKeyUp(keyCode, event)
     }
-
-    // Chame esse método sempre que adicionar tag
-    fun adicionarTag(epc: String) {
-        tags.add(EpcTag(epc))
-        atualizarLista()
-    }
-
-    private fun atualizarLista() {
-        tvContadorTags.text = "Total de tags lidas: ${tags.size}"
-        tvNenhumaTag.visibility = if (tags.isEmpty()) android.view.View.VISIBLE else android.view.View.GONE
-        adapter.notifyDataSetChanged()
-    }
 }
+
