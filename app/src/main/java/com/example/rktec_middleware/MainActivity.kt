@@ -6,7 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModelProvider
-import com.example.rktec_middleware.ui.screens.TelaLeituraRfid
+import com.example.rktec_middleware.ui.screens.TelaLeituraColeta
 import com.example.rktec_middleware.viewmodel.RfidViewModel
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -15,7 +15,8 @@ import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
 import com.example.rktec_middleware.ui.screens.TelaInventario
 import com.example.rktec_middleware.ui.screens.TelaLeituraInventario
 import com.example.rktec_middleware.data.db.AppDatabase
-
+import com.example.rktec_middleware.ui.screens.TelaDebug
+import com.example.rktec_middleware.ui.screens.TelaSobre
 
 
 class MainActivity : ComponentActivity() {
@@ -38,9 +39,11 @@ class MainActivity : ComponentActivity() {
             when (telaAtual) {
                 "menu" -> TelaPrincipal(
                     onColetaClick = { telaAtual = "leitura" },
-                    onInventarioClick = { telaAtual = "inventario" }
+                    onInventarioClick = { telaAtual = "inventario" },
+                    onDebugClick = { telaAtual = "debug" },
+                    onSobreClick = { telaAtual = "sobre" }
                 )
-                "leitura" -> TelaLeituraRfid(
+                "leitura" -> TelaLeituraColeta(
                     viewModel = viewModel,
                     onVoltar = { telaAtual = "menu" }
                 )
@@ -51,6 +54,13 @@ class MainActivity : ComponentActivity() {
                 "leituraInventario" -> TelaLeituraInventario(
                     onVoltar = { telaAtual = "menu" },
                     banco = appDatabase
+                )
+                "debug" -> TelaDebug(
+                    banco = appDatabase,
+                    onVoltar = { telaAtual = "menu" }
+                )
+                "sobre" -> TelaSobre(
+                    onVoltar = { telaAtual = "menu" }
                 )
             }
         }

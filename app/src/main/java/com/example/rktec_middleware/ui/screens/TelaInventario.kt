@@ -1,6 +1,7 @@
 package com.example.rktec_middleware.ui.screens
 
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -18,11 +19,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rktec_middleware.util.LeitorInventario
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
-import kotlinx.coroutines.launch
+import com.example.rktec_middleware.util.LeitorInventario
 import com.airbnb.lottie.compose.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun TelaInventario(
@@ -37,6 +38,19 @@ fun TelaInventario(
     var dadosImportados by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var erroImportacao by remember { mutableStateOf<String?>(null) }
+    var refresh by remember { mutableStateOf(0) }
+
+    // Sempre busca do banco ao montar ou quando refresh muda
+    LaunchedEffect(refresh) {
+        val dadosSalvos = db.inventarioDao().listarTodos()
+        if (dadosSalvos.isNotEmpty()) {
+            dadosImportados = dadosSalvos
+            nomeArquivo = "Dados recuperados do banco"
+        } else {
+            dadosImportados = emptyList()
+            nomeArquivo = null
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -46,15 +60,34 @@ fun TelaInventario(
                 erroImportacao = null
                 nomeArquivo = it.lastPathSegment
                 scope.launch {
-                    val lista = LeitorInventario.lerCsv(context, it)
+                    val contentResolver = context.contentResolver
+                    val mime = contentResolver.getType(it) ?: ""
+                    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)?.lowercase()
+                        ?: it.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
+                        ?: ""
+
+                    val lista = when (extension) {
+                        "csv" -> LeitorInventario.lerCsv(context, it)
+                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, it)
+                        else -> emptyList()
+                    }
+
                     if (lista.isNotEmpty()) {
-                        // Persistência automática!
                         db.inventarioDao().inserirTodos(lista)
+                        val epcTags = lista.map {
+                            com.example.rktec_middleware.data.model.EpcTag(
+                                epc = it.tag,
+                                descricao = it.desc
+                            )
+                        }
+                        db.coletaDao().inserirTodos(epcTags)
                         dadosImportados = lista
-                        erroImportacao = null
+                        nomeArquivo = it.lastPathSegment
+                        refresh++
                     } else {
-                        erroImportacao = "Planilha inválida!\nCertifique-se que existam as colunas 'tag' e 'desc.Item' ou 'nome'."
+                        erroImportacao = "Planilha inválida!\nCertifique-se que existam as colunas necessárias."
                         dadosImportados = emptyList()
+                        nomeArquivo = null
                     }
                     isLoading = false
                 }
@@ -62,27 +95,30 @@ fun TelaInventario(
         }
     )
 
+    // ------ UI --------
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .padding(top = 32.dp, bottom = 24.dp)
     ) {
-        // Cabeçalho
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(90.dp)
+                .height(100.dp)
+                .offset(y = -32.dp)
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFF4A90E2), Color(0xFF174D86))
                     )
-                )
+                ),
+            contentAlignment = Alignment.Center
         ) {
             IconButton(
-                onClick = { onVoltar() },
+                onClick = onVoltar,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 8.dp, top = 10.dp)
+                    .padding(start = 8.dp, top = 32.dp)
                     .size(48.dp)
             ) {
                 Icon(
@@ -92,14 +128,13 @@ fun TelaInventario(
                     modifier = Modifier.size(32.dp)
                 )
             }
+
             Text(
-                "Inventário",
+                "INVENTÁRIO",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(top = 10.dp)
+                modifier = Modifier.padding(top = 32.dp)
             )
         }
 
@@ -113,10 +148,9 @@ fun TelaInventario(
             verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // ----> Esse botão aparece sempre!
             Button(
-                onClick = {
-                    launcher.launch("application/vnd.ms-excel")
-                },
+                onClick = { launcher.launch("*/*") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp),
@@ -141,6 +175,16 @@ fun TelaInventario(
                 Text("Analisando planilha...", color = Color.Gray)
             }
 
+            // ----> Mensagem se não tem dados
+            if (dadosImportados.isEmpty() && !isLoading) {
+                Text(
+                    "Nenhuma planilha importada.\nImporte uma planilha para começar.",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray
+                )
+            }
+
+            // ----> Esse botão só aparece se tem dado salvo
             if (dadosImportados.isNotEmpty() && !isLoading && erroImportacao == null) {
                 Button(
                     onClick = { onIniciarLeituraInventario() },
@@ -158,15 +202,24 @@ fun TelaInventario(
 
     if (erroImportacao != null) {
         AlertDialog(
-            onDismissRequest = { erroImportacao = null; isLoading = false; dadosImportados = emptyList() },
+            onDismissRequest = {
+                erroImportacao = null
+                isLoading = false
+                dadosImportados = emptyList()
+                refresh++
+            },
             title = { Text("Erro ao importar planilha") },
             text = { Text(erroImportacao ?: "") },
             confirmButton = {
-                TextButton(onClick = { erroImportacao = null; isLoading = false; dadosImportados = emptyList() }) {
+                TextButton(onClick = {
+                    erroImportacao = null
+                    isLoading = false
+                    dadosImportados = emptyList()
+                    refresh++
+                }) {
                     Text("Ok")
                 }
             }
         )
     }
-
 }

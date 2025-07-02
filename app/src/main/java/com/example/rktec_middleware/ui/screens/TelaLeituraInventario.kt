@@ -1,13 +1,14 @@
 package com.example.rktec_middleware.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +18,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.viewmodel.RfidViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
@@ -27,22 +29,8 @@ fun TelaLeituraInventario(
     onVoltar: () -> Unit,
     banco: AppDatabase
 ) {
-    val scope = rememberCoroutineScope()
-    var lendo by remember { mutableStateOf(false) }
-    var tagsLidas by remember { mutableStateOf<List<Pair<ItemInventario?, String>>>(emptyList()) }
-    var statusMsg by remember { mutableStateOf<String?>(null) }
-    var isDialogVoltarAberto by remember { mutableStateOf(false) }
-
-    // Função de leitura (troca pelo trigger do PDA!)
-    fun lerTag(tag: String) {
-        lendo = true
-        scope.launch {
-            val item = banco.inventarioDao().buscarPorTag(tag)
-            tagsLidas = tagsLidas + Pair(item, tag)
-            statusMsg = if (item != null) "Item encontrado: ${item.descricao}" else "Item NÃO encontrado!"
-            lendo = false
-        }
-    }
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<RfidViewModel>()
+    val tags by viewModel.tagList.collectAsState()
 
     Column(
         modifier = Modifier
@@ -60,13 +48,13 @@ fun TelaLeituraInventario(
                         listOf(Color(0xFF4A90E2), Color(0xFF174D86))
                     )
                 ),
-            contentAlignment = Alignment.Center
         ) {
             IconButton(
-                onClick = { isDialogVoltarAberto = true },
+                onClick = onVoltar,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 8.dp, top = 10.dp)
+                    .padding(start = 8.dp)
+                    .padding(top = 32.dp)
                     .size(48.dp)
             ) {
                 Icon(
@@ -76,31 +64,32 @@ fun TelaLeituraInventario(
                     modifier = Modifier.size(32.dp)
                 )
             }
+
             Text(
-                "Leitura de Inventário",
+                "INVENTÁRIO",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(top = 10.dp)
+                    .padding(top = 32.dp)
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Status leitura
         Text(
-            if (lendo) "Lendo tag..." else "Aguardando leitura do dispositivo",
+            "Pressione o gatilho para ler",
             fontWeight = FontWeight.Bold,
             color = Color(0xFF4A90E2),
             fontSize = 18.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
+
         Text(
-            "Total de EPCs verificados: ${tagsLidas.size}",
+            "Total de tags lidas: ${tags.size}",
             fontSize = 16.sp,
             color = Color.DarkGray,
             modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -108,20 +97,20 @@ fun TelaLeituraInventario(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Lista de resultados
         Card(
             shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = 12.dp)
         ) {
-            if (tagsLidas.isEmpty()) {
+            if (tags.isEmpty()) {
                 Box(
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Nenhuma tag inventariada ainda", color = Color.Gray)
+                    Text("Nenhuma etiqueta lida ainda", color = Color.Gray)
                 }
             } else {
                 LazyColumn(
@@ -129,22 +118,19 @@ fun TelaLeituraInventario(
                         .fillMaxSize()
                         .padding(8.dp)
                 ) {
-                    items(tagsLidas) { (item, tag) ->
+                    items(tags) { tag ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = if (item != null) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
-                                contentDescription = null,
-                                tint = if (item != null) Color(0xFF2E7D32) else Color.Red
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "Tag",
+                                tint = Color(0xFF4A90E2),
+                                modifier = Modifier.size(24.dp)
                             )
-                            Spacer(Modifier.width(10.dp))
-                            Text(tag, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Spacer(Modifier.width(10.dp))
-                            Text(item?.descricao ?: "Não cadastrado", color = Color.Gray)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(tag.epc, fontSize = 16.sp)
                         }
                         Divider()
                     }
@@ -152,44 +138,26 @@ fun TelaLeituraInventario(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Simulador de leitura (substitua pelo gatilho do PDA)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        Button(
+            onClick = {
+                CoroutineScope(Dispatchers.IO).launch {
+                    val dao = banco.coletaDao()
+                    dao.inserirTodos(tags)
+                    Log.d("LeituraInventario", "Salvo ${tags.size} tags no banco.")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 8.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
         ) {
-            Button(
-                onClick = { lerTag("EPC001") },
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
-            ) { Text("Simular EPC001", color = Color.White) }
-
-            Button(
-                onClick = { lerTag("ALEATORIO") },
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
-            ) { Text("Simular Tag Inválida", color = Color.White) }
+            Text("Finalizar Inventário", fontSize = 20.sp, color = Color.White)
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-    }
-
-    // Diálogo de confirmação para voltar
-    if (isDialogVoltarAberto) {
-        AlertDialog(
-            onDismissRequest = { isDialogVoltarAberto = false },
-            title = { Text("Confirmar saída") },
-            text = { Text("Deseja realmente voltar? O progresso do inventário será perdido.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    isDialogVoltarAberto = false
-                    onVoltar()
-                }) { Text("Sim") }
-            },
-            dismissButton = {
-                TextButton(onClick = { isDialogVoltarAberto = false }) { Text("Não") }
-            }
-        )
+        Spacer(modifier = Modifier.height(20.dp))
     }
 }

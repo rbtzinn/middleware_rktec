@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.rktec_middleware"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -66,6 +66,8 @@ dependencies {
     implementation("com.jakewharton.timber:timber:5.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
+    implementation ("org.apache.poi:poi:5.2.5")
+    implementation ("org.apache.poi:poi-ooxml:5.2.5")
 
     // ROOM (AQUI ESTÁ CERTO!)
     implementation("androidx.room:room-runtime:2.6.1")

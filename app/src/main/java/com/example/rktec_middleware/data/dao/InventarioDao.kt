@@ -13,4 +13,8 @@ interface InventarioDao {
 
     @Query("SELECT * FROM inventario WHERE tag = :tag LIMIT 1")
     suspend fun buscarPorTag(tag: String): ItemInventario?
+
+    @Query("DELETE FROM inventario")
+    suspend fun limparInventario()
 }
+

@@ -24,9 +24,8 @@ import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.Brush
 
-
 @Composable
-fun TelaLeituraRfid(
+fun TelaLeituraColeta(
     viewModel: RfidViewModel,
     onVoltar: () -> Unit
 ) {
@@ -44,24 +43,31 @@ fun TelaLeituraRfid(
     var naoMostrarLimpar by rememberSaveable { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(top = 32.dp, bottom = 24.dp)
     ) {
+        // CABEÇALHO
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(90.dp)
+                .height(100.dp)
+                .offset(y = -32.dp)
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFF4A90E2), Color(0xFF174D86))
                     )
                 )
         ) {
+            // Ícone Voltar/
             IconButton(
                 onClick = { isDialogVoltarAberto = true },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 8.dp, top = 10.dp)
+                    .padding(start = 8.dp)
                     .size(48.dp)
+                    .padding(top = 32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack,
@@ -70,17 +76,17 @@ fun TelaLeituraRfid(
                     modifier = Modifier.size(32.dp)
                 )
             }
-
+            // TÍTULO CENTRALIZADO
             Text(
-                "Leitura de Tags",
+                "COLETA",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(top = 10.dp)
+                    .padding(top = 32.dp)
             )
-
+            // Ícone Limpar à direita
             IconButton(
                 onClick = {
                     if (naoMostrarLimpar) {
@@ -91,8 +97,9 @@ fun TelaLeituraRfid(
                 },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 8.dp, top = 10.dp)
+                    .padding(end = 8.dp)
                     .size(48.dp)
+                    .padding(top = 32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
@@ -177,21 +184,23 @@ fun TelaLeituraRfid(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Botão Finalizar Coleta (apenas volta pra home/menu)
         Button(
-            onClick = { viewModel.adicionarTagFake() },
+            onClick = { onVoltar() },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .padding(horizontal = 8.dp),
             shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
         ) {
-            Text("Simular Leitura", fontSize = 20.sp, color = Color.White)
+            Text("Finalizar Coleta", fontSize = 20.sp, color = Color.White)
         }
 
         Spacer(modifier = Modifier.height(20.dp))
     }
 
+    // Dialog de confirmação ao voltar
     if (isDialogVoltarAberto) {
         AlertDialog(
             onDismissRequest = { isDialogVoltarAberto = false },
@@ -215,6 +224,7 @@ fun TelaLeituraRfid(
         )
     }
 
+    // Dialog de confirmação ao limpar
     if (isDialogLimparAberto) {
         AlertDialog(
             onDismissRequest = { isDialogLimparAberto = false },

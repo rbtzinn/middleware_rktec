@@ -1,0 +1,192 @@
+package com.example.rktec_middleware.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.rktec_middleware.data.db.AppDatabase
+import com.example.rktec_middleware.data.model.EpcTag
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TelaDebug(
+    banco: AppDatabase,
+    onVoltar: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var epcs by remember { mutableStateOf<List<EpcTag>>(emptyList()) }
+    var mostrarDialog by remember { mutableStateOf(false) }
+
+    // Carrega as tags do banco
+    LaunchedEffect(Unit) {
+        scope.launch {
+            epcs = banco.coletaDao().listarTodas()
+        }
+    }
+
+    // Função para limpar o banco e atualizar a lista
+    fun limparBanco() {
+        scope.launch {
+            banco.coletaDao().limparColetas()
+            banco.inventarioDao().limparInventario()
+            epcs = emptyList()
+        }
+    }
+
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        // Cabeçalho estiloso
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF4A90E2), Color(0xFF174D86))
+                    )
+                )
+        ) {
+            IconButton(
+                onClick = { onVoltar() },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp)
+                    .size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowBack,
+                    contentDescription = "Voltar",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Text(
+                "DEBUG",
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+
+            // Botão de limpar banco
+            TextButton(
+                onClick = { mostrarDialog = true },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 10.dp)
+            ) {
+                Text("Limpar Banco", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Card estiloso central
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 7.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+            ) {
+                Text(
+                    "Total de tags: ${epcs.size}",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (epcs.isEmpty()) {
+                    Box(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Nenhuma tag salva ainda.", color = Color.Gray)
+                    }
+                } else {
+                    LazyColumn {
+                        items(epcs) { tag ->
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${tag.epc} - ${formatarData(tag.timestamp)}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (tag.descricao.isNotBlank()) {
+                                    Text(
+                                        text = tag.descricao,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFF4A90E2),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Dialog de confirmação
+        if (mostrarDialog) {
+            AlertDialog(
+                onDismissRequest = { mostrarDialog = false },
+                title = { Text("Limpar Banco de Dados?") },
+                text = { Text("Tem certeza que deseja apagar todas as tags salvas? Essa ação não pode ser desfeita.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            mostrarDialog = false
+                            limparBanco()
+                        }
+                    ) {
+                        Text("Apagar", color = Color.Red)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { mostrarDialog = false }
+                    ) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
+    }
+}
+
+fun formatarData(timestamp: Long): String {
+    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
+    return sdf.format(Date(timestamp))
+}

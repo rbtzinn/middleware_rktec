@@ -17,7 +17,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 @Composable
 fun TelaPrincipal(
     onColetaClick: () -> Unit,
-    onInventarioClick: () -> Unit
+    onInventarioClick: () -> Unit,
+    onDebugClick: () -> Unit,
+    onSobreClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -68,7 +70,7 @@ fun TelaPrincipal(
             }
             item {
                 Button(
-                    onClick = { onInventarioClick() },
+                    onClick = onInventarioClick,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(80.dp),
@@ -78,49 +80,53 @@ fun TelaPrincipal(
                     Text("Inventário", fontSize = 26.sp, color = Color.White)
                 }
             }
-
-            // Depois você pode adicionar outros botões aqui:
-            /*
-            item {
-                Button(
-                    onClick = { /* ... */ },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
-                ) {
-                    Text("Inventário", fontSize = 26.sp, color = Color.White)
-                }
-            }
-            */
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Créditos e COPY
+        Divider(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            color = Color(0xFFE0E0E0),
+            thickness = 1.dp
+        )
+
+        // Footer simples e elegante
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(bottom = 8.dp)
         ) {
-            Text("Back-end: Roberto Gabriel", fontSize = 15.sp, color = Color.Gray)
-            Text("Front/Designer: Kawã Vinícius", fontSize = 15.sp, color = Color.Gray)
+            TextButton(
+                onClick = onDebugClick,
+            ) {
+                Text(
+                    "Ver debug de coletas",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            TextButton(
+                onClick = onSobreClick, // Novo: abre a tela Sobre!
+            ) {
+                Text(
+                    "RKTECNOLOGIAS",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF009688),
+                    fontSize = 16.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                "Desenvolvido por: RKTEC",
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF009688),
-                fontSize = 16.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "COPY Todos os direitos reservados — RKTECNOLOGIAS",
+                "Todos os direitos reservados — RKTECNOLOGIAS",
                 fontSize = 12.sp,
                 color = Color.Gray,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
             )
         }
     }
 }
+
 
