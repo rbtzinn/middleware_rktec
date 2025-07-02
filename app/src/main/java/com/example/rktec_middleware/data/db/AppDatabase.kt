@@ -10,11 +10,13 @@ import com.example.rktec_middleware.data.dao.ColetaDao
 import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.EpcTag
+import com.example.rktec_middleware.data.dao.MapeamentoDao
 
 @Database(entities = [ItemInventario::class, EpcTag::class], version = 3)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
     abstract fun coletaDao(): ColetaDao
+    abstract fun mapeamentoDao(): MapeamentoDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

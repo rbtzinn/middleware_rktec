@@ -23,6 +23,7 @@ import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.util.LeitorInventario
 import com.airbnb.lottie.compose.*
+import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 import kotlinx.coroutines.launch
 
 @Composable
@@ -67,8 +68,8 @@ fun TelaInventario(
                         ?: ""
 
                     val lista = when (extension) {
-                        "csv" -> LeitorInventario.lerCsv(context, it)
-                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, it)
+                        "csv" -> LeitorInventario.lerCsv(context, it, MapeamentoPlanilha())
+                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, it, MapeamentoPlanilha())
                         else -> emptyList()
                     }
 
