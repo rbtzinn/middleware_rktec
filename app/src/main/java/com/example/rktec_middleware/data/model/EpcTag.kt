@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 data class EpcTag(
     @PrimaryKey val epc: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val descricao: String = "" // importante!
+    val setor: String = "",
+    val descricao: String = ""
 )
 

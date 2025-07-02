@@ -6,5 +6,6 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "inventario")
 data class ItemInventario(
     @PrimaryKey val tag: String,
-    val desc: String
+    val desc: String,
+    val localizacao: String = ""
 )

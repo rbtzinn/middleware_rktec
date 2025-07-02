@@ -77,7 +77,8 @@ fun TelaInventario(
                         val epcTags = lista.map {
                             com.example.rktec_middleware.data.model.EpcTag(
                                 epc = it.tag,
-                                descricao = it.desc
+                                descricao = it.desc,
+                                setor = it.localizacao
                             )
                         }
                         db.coletaDao().inserirTodos(epcTags)

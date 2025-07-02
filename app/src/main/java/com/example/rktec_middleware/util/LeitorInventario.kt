@@ -20,6 +20,8 @@ object LeitorInventario {
 
     val apelidosTag = setOf("tag", "epc", "etiqueta", "codigo", "codigorfid", "codigodebarra")
     val apelidosDesc = setOf("descricao", "desc", "detalhe", "item", "descdetalhada", "nome", "produto", "descitem")
+    val apelidosSetor = setOf("localizacao", "setor", "codsetor", "local", "posicao")
+
 
     fun lerCsv(context: Context, uri: Uri): List<ItemInventario> {
         val resultado = mutableListOf<ItemInventario>()
@@ -45,6 +47,8 @@ object LeitorInventario {
         // Pega índice das colunas
         val indexTag = cabecalhoNormalizado.indexOfFirst { apelidosTag.contains(it) }
         val indexDesc = cabecalhoNormalizado.indexOfFirst { apelidosDesc.contains(it) }
+        val indexSetor = cabecalhoNormalizado.indexOfFirst { apelidosSetor.contains(it) }
+
 
         if (indexTag == -1) throw Exception("Coluna de TAG/RFID não encontrada!")
         // Desc é opcional, mas se não existir, põe string vazia
@@ -57,8 +61,9 @@ object LeitorInventario {
 
             val tag = colunas[indexTag]
             val desc = if (indexDesc != -1 && colunas.size > indexDesc) colunas[indexDesc] else ""
+            val setor = if (indexSetor != -1 && colunas.size > indexSetor) colunas[indexSetor] else ""
             if (tag.isNotBlank()) {
-                resultado.add(ItemInventario(tag, desc))
+                resultado.add(ItemInventario(tag, desc, setor))
             }
         }
         return resultado
@@ -78,11 +83,13 @@ object LeitorInventario {
 
             var indexTag = -1
             var indexDesc = -1
+            var indexSetor = -1
 
             for (cell in headerRow) {
                 val valor = cell.toString().trim().lowercase().replace(" ", "")
                 if (valor == "tag" || valor == "epc") indexTag = cell.columnIndex
                 if (valor == "desc.item" || valor == "descricao" || valor == "nome" || valor == "item") indexDesc = cell.columnIndex
+                if (apelidosSetor.contains(valor)) indexSetor = cell.columnIndex
             }
 
             Log.d("LeitorExcel", "IndexTag: $indexTag, IndexDesc: $indexDesc")
@@ -96,10 +103,12 @@ object LeitorInventario {
                 val row = sheet.getRow(i) ?: continue
                 val tag = row.getCell(indexTag)?.toString()?.trim()
                 val desc = row.getCell(indexDesc)?.toString()?.trim() ?: ""
+                val setor = if (indexSetor != -1) row.getCell(indexSetor)?.toString()?.trim() ?: "" else ""
                 if (!tag.isNullOrBlank()) {
-                    lista.add(ItemInventario(tag, desc))
+                    lista.add(ItemInventario(tag, desc, setor))
                 }
             }
+
 
             workbook.close()
         } catch (e: OutOfMemoryError) {

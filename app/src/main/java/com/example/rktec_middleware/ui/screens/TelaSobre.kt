@@ -90,7 +90,7 @@ fun TelaSobre(onVoltar: () -> Unit) {
                 Divider()
                 Spacer(modifier = Modifier.height(18.dp))
                 Text(
-                    "Desenvolvido por Kawã Vinícius\ne equipe RKTEC Tecnologias.",
+                    "Desenvolvido por Roberto Gabriel, Kawã Vinicius\n e equipe RKTEC Tecnologias.",
                     fontSize = 16.sp,
                     color = Color(0xFF4A90E2),
                     fontWeight = FontWeight.Medium

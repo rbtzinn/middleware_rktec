@@ -149,10 +149,32 @@ fun TelaDebug(
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
+                                // --- AQUI É ONDE ENTRA O BLOCO DO SETOR ---
+                                if (tag.setor.isNotBlank()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color(0xFFE1F5FE), shape = RoundedCornerShape(8.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "Setor: ${tag.setor}",
+                                                color = Color(0xFF0277BD),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        }
+                                    }
+                                }
+                                // ------------------------------------------
                                 Divider()
                             }
                         }
                     }
+
                 }
             }
         }
