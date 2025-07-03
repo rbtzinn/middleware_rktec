@@ -19,4 +19,7 @@ interface MapeamentoDao {
 
     @Delete
     suspend fun deletar(mapeamento: MapeamentoPlanilha)
+
+    @Query("DELETE FROM mapeamento_planilha")
+    suspend fun deletarTudo()
 }

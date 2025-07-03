@@ -44,9 +44,9 @@ object LeitorInventario {
             val tag = colunas.getOrNull(mapeamento.colunaEpc) ?: ""
             val desc = mapeamento.colunaNome?.let { colunas.getOrNull(it) } ?: ""
             val setor = mapeamento.colunaSetor?.let { colunas.getOrNull(it) } ?: ""
-            // Pode adicionar loja se quiser!
+            val loja = mapeamento.colunaLoja?.let { colunas.getOrNull(it) } ?: ""
             if (tag.isNotBlank()) {
-                resultado.add(ItemInventario(tag, desc, setor))
+                resultado.add(ItemInventario(tag, desc, setor, loja))
             }
         }
         return resultado
@@ -64,10 +64,11 @@ object LeitorInventario {
                 val tag = row.getCell(mapeamento.colunaEpc)?.toString()?.trim() ?: ""
                 val desc = mapeamento.colunaNome?.let { row.getCell(it)?.toString()?.trim() ?: "" } ?: ""
                 val setor = mapeamento.colunaSetor?.let { row.getCell(it)?.toString()?.trim() ?: "" } ?: ""
-                // Pode adicionar loja se quiser!
+                val loja = mapeamento.colunaLoja?.let { row.getCell(it)?.toString()?.trim() ?: "" } ?: ""
                 if (tag.isNotBlank()) {
-                    lista.add(ItemInventario(tag, desc, setor))
+                    lista.add(ItemInventario(tag, desc, setor, loja))
                 }
+
             }
             workbook.close()
         } catch (e: OutOfMemoryError) {

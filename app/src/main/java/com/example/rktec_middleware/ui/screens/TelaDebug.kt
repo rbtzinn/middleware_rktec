@@ -30,7 +30,7 @@ fun TelaDebug(
 ) {
     val scope = rememberCoroutineScope()
     var epcs by remember { mutableStateOf<List<EpcTag>>(emptyList()) }
-    var mostrarDialog by remember { mutableStateOf(false) }
+    var mostrarDialogLimparBanco by remember { mutableStateOf(false) }
 
     // Carrega as tags do banco
     LaunchedEffect(Unit) {
@@ -44,9 +44,11 @@ fun TelaDebug(
         scope.launch {
             banco.coletaDao().limparColetas()
             banco.inventarioDao().limparInventario()
+            banco.mapeamentoDao().deletarTudo()
             epcs = emptyList()
         }
     }
+
 
 
     Column(
@@ -90,7 +92,7 @@ fun TelaDebug(
 
             // Botão de limpar banco
             TextButton(
-                onClick = { mostrarDialog = true },
+                onClick = { mostrarDialogLimparBanco = true },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 10.dp)
@@ -149,7 +151,6 @@ fun TelaDebug(
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
-                                // --- AQUI É ONDE ENTRA O BLOCO DO SETOR ---
                                 if (tag.setor.isNotBlank()) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -169,11 +170,31 @@ fun TelaDebug(
                                         }
                                     }
                                 }
-                                // ------------------------------------------
+                                // --- BLOCO DA LOJA ---
+                                if (tag.loja?.isNotBlank() == true) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color(0xFFD1F5D5), shape = RoundedCornerShape(8.dp))
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "Loja: ${tag.loja}",
+                                                color = Color(0xFF2E7D32),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                            )
+                                        }
+                                    }
+                                }
                                 Divider()
                             }
                         }
                     }
+
 
                 }
             }
@@ -181,30 +202,49 @@ fun TelaDebug(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Dialog de confirmação
-        if (mostrarDialog) {
+        if (mostrarDialogLimparBanco) {
             AlertDialog(
-                onDismissRequest = { mostrarDialog = false },
-                title = { Text("Limpar Banco de Dados?") },
-                text = { Text("Tem certeza que deseja apagar todas as tags salvas? Essa ação não pode ser desfeita.") },
+                onDismissRequest = { mostrarDialogLimparBanco = false },
+                title = {
+                    Text(
+                        "⚠️ Atenção: Limpar TODOS os dados!",
+                        color = Color.Red,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                },
+                text = {
+                    Text(
+                        "Isso vai apagar o inventário, as tags coletadas e o mapeamento de colunas!\n\nEssa ação NÃO pode ser desfeita.",
+                        color = Color.DarkGray,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 confirmButton = {
-                    TextButton(
+                    Button(
                         onClick = {
-                            mostrarDialog = false
-                            limparBanco()
-                        }
+                            mostrarDialogLimparBanco = false
+                            scope.launch {
+                                banco.inventarioDao().limparInventario()
+                                banco.coletaDao().limparColetas()
+                                banco.mapeamentoDao().deletarTudo()
+                                epcs = emptyList()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                     ) {
-                        Text("Apagar", color = Color.Red)
+                        Text("APAGAR TUDO", color = Color.White)
                     }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { mostrarDialog = false }
+                    OutlinedButton(
+                        onClick = { mostrarDialogLimparBanco = false }
                     ) {
                         Text("Cancelar")
                     }
                 }
             )
         }
+
     }
 }
 

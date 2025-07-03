@@ -21,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.util.LeitorInventario
 import com.airbnb.lottie.compose.*
-import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 import kotlinx.coroutines.launch
 
 @Composable
@@ -40,8 +40,10 @@ fun TelaInventario(
     var isLoading by remember { mutableStateOf(false) }
     var erroImportacao by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableStateOf(0) }
+    var uriParaMapeamento by remember { mutableStateOf<Uri?>(null) }
+    var mostrarTelaMapeamento by remember { mutableStateOf(false) }
 
-    // Sempre busca do banco ao montar ou quando refresh muda
+    // Busca do banco ao montar ou quando refresh muda
     LaunchedEffect(refresh) {
         val dadosSalvos = db.inventarioDao().listarTodos()
         if (dadosSalvos.isNotEmpty()) {
@@ -57,10 +59,22 @@ fun TelaInventario(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
             uri?.let {
-                isLoading = true
-                erroImportacao = null
-                nomeArquivo = it.lastPathSegment
                 scope.launch {
+                    isLoading = true
+                    erroImportacao = null
+                    nomeArquivo = it.lastPathSegment
+
+                    // Busca mapeamento salvo
+                    val mapeamento = db.mapeamentoDao().buscarPrimeiro()
+                    if (mapeamento == null) {
+                        // Não tem mapeamento: abre tela de mapeamento e já importa na volta
+                        uriParaMapeamento = it
+                        mostrarTelaMapeamento = true
+                        isLoading = false
+                        return@launch
+                    }
+
+                    // Já tem mapeamento: lê e importa direto
                     val contentResolver = context.contentResolver
                     val mime = contentResolver.getType(it) ?: ""
                     val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)?.lowercase()
@@ -68,18 +82,19 @@ fun TelaInventario(
                         ?: ""
 
                     val lista = when (extension) {
-                        "csv" -> LeitorInventario.lerCsv(context, it, MapeamentoPlanilha())
-                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, it, MapeamentoPlanilha())
+                        "csv" -> LeitorInventario.lerCsv(context, it, mapeamento)
+                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, it, mapeamento)
                         else -> emptyList()
                     }
 
                     if (lista.isNotEmpty()) {
                         db.inventarioDao().inserirTodos(lista)
-                        val epcTags = lista.map {
-                            com.example.rktec_middleware.data.model.EpcTag(
-                                epc = it.tag,
-                                descricao = it.desc,
-                                setor = it.localizacao
+                        val epcTags = lista.map { item ->
+                            EpcTag(
+                                epc = item.tag,
+                                descricao = item.desc,
+                                setor = item.localizacao,
+                                loja = item.loja
                             )
                         }
                         db.coletaDao().inserirTodos(epcTags)
@@ -87,7 +102,7 @@ fun TelaInventario(
                         nomeArquivo = it.lastPathSegment
                         refresh++
                     } else {
-                        erroImportacao = "Planilha inválida!\nCertifique-se que existam as colunas necessárias."
+                        erroImportacao = "Planilha inválida!\nVerifique se tem as colunas necessárias."
                         dadosImportados = emptyList()
                         nomeArquivo = null
                     }
@@ -97,7 +112,59 @@ fun TelaInventario(
         }
     )
 
-    // ------ UI --------
+    // Tela de mapeamento, se precisar
+    if (mostrarTelaMapeamento && uriParaMapeamento != null) {
+        TelaMapeamentoPlanilha(
+            uri = uriParaMapeamento!!,
+            onSalvar = { mapeamento ->
+                scope.launch {
+                    db.mapeamentoDao().inserir(mapeamento)
+
+                    // Importa já no callback
+                    val contentResolver = context.contentResolver
+                    val mime = contentResolver.getType(uriParaMapeamento!!) ?: ""
+                    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)?.lowercase()
+                        ?: uriParaMapeamento!!.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
+                        ?: ""
+
+                    val lista = when (extension) {
+                        "csv" -> LeitorInventario.lerCsv(context, uriParaMapeamento!!, mapeamento)
+                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, uriParaMapeamento!!, mapeamento)
+                        else -> emptyList()
+                    }
+
+                    if (lista.isNotEmpty()) {
+                        db.inventarioDao().inserirTodos(lista)
+                        val epcTags = lista.map { item ->
+                            EpcTag(
+                                epc = item.tag,
+                                descricao = item.desc,
+                                setor = item.localizacao,
+                                loja = item.loja
+                            )
+                        }
+                        db.coletaDao().inserirTodos(epcTags)
+                        dadosImportados = lista
+                        nomeArquivo = uriParaMapeamento!!.lastPathSegment
+                        refresh++
+                        mostrarTelaMapeamento = false
+                    } else {
+                        erroImportacao = "Planilha inválida!\nVerifique se tem as colunas necessárias."
+                        dadosImportados = emptyList()
+                        nomeArquivo = null
+                        mostrarTelaMapeamento = false
+                    }
+                }
+            },
+            onCancelar = {
+                mostrarTelaMapeamento = false
+                uriParaMapeamento = null
+            }
+        )
+        return // Não desenha mais nada da TelaInventario quando estiver na tela de mapeamento!
+    }
+
+    // ------ UI principal --------
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -142,7 +209,6 @@ fun TelaInventario(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Corpo
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -150,7 +216,6 @@ fun TelaInventario(
             verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ----> Esse botão aparece sempre!
             Button(
                 onClick = { launcher.launch("*/*") },
                 modifier = Modifier
@@ -177,7 +242,6 @@ fun TelaInventario(
                 Text("Analisando planilha...", color = Color.Gray)
             }
 
-            // ----> Mensagem se não tem dados
             if (dadosImportados.isEmpty() && !isLoading) {
                 Text(
                     "Nenhuma planilha importada.\nImporte uma planilha para começar.",
@@ -186,7 +250,6 @@ fun TelaInventario(
                 )
             }
 
-            // ----> Esse botão só aparece se tem dado salvo
             if (dadosImportados.isNotEmpty() && !isLoading && erroImportacao == null) {
                 Button(
                     onClick = { onIniciarLeituraInventario() },
@@ -202,6 +265,7 @@ fun TelaInventario(
         }
     }
 
+    // ------ DIALOG DE ERRO ------
     if (erroImportacao != null) {
         AlertDialog(
             onDismissRequest = {
@@ -210,7 +274,7 @@ fun TelaInventario(
                 dadosImportados = emptyList()
                 refresh++
             },
-            title = { Text("Erro ao importar planilha") },
+            title = { Text("Erro ao importar planilha", color = Color.Red, fontWeight = FontWeight.ExtraBold) },
             text = { Text(erroImportacao ?: "") },
             confirmButton = {
                 TextButton(onClick = {

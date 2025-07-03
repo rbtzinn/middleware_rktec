@@ -9,6 +9,8 @@ data class EpcTag(
     @PrimaryKey val epc: String,
     val timestamp: Long = System.currentTimeMillis(),
     val setor: String = "",
-    val descricao: String = ""
+    val descricao: String = "",
+    val loja: String = ""
 )
+
 

@@ -11,8 +11,11 @@ import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.data.dao.MapeamentoDao
+import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 
-@Database(entities = [ItemInventario::class, EpcTag::class], version = 3)
+
+@Database(entities = [ItemInventario::class, EpcTag::class, MapeamentoPlanilha::class], version = 7)
+
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
     abstract fun coletaDao(): ColetaDao
@@ -21,13 +24,6 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
 
-        // MIGRAÇÃO de v2 para v3: adiciona coluna localizacao
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE inventario ADD COLUMN localizacao TEXT NOT NULL DEFAULT ''")
-            }
-        }
-
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -35,8 +31,9 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "rktec.db"
                 )
-                    .addMigrations(MIGRATION_2_3)
-                    .build().also { INSTANCE = it }
+                    .fallbackToDestructiveMigration()
+                    .build()
+
             }
         }
     }
