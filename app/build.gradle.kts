@@ -68,6 +68,14 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
     implementation ("org.apache.poi:poi:5.2.5")
     implementation ("org.apache.poi:poi-ooxml:5.2.5")
+    implementation("androidx.compose.material3:material3:1.1.0")
+    implementation ("io.github.vanpra.compose-material-dialogs:datetime:0.9.0")
+    implementation("io.github.vanpra.compose-material-dialogs:core:0.9.0")
+
+
+
+
+
 
     // ROOM (AQUI ESTÁ CERTO!)
     implementation("androidx.room:room-runtime:2.6.1")

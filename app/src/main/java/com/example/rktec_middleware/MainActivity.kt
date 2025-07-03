@@ -1,11 +1,11 @@
 package com.example.rktec_middleware
 
+import TelaImportacao
 import android.os.Bundle
 import android.view.KeyEvent
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.lifecycle.ViewModelProvider
 import com.example.rktec_middleware.ui.screens.TelaLeituraColeta
@@ -18,8 +18,9 @@ import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
 import com.example.rktec_middleware.ui.screens.TelaInventario
 import com.example.rktec_middleware.ui.screens.TelaLeituraInventario
 import com.example.rktec_middleware.data.db.AppDatabase
+import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.ui.screens.TelaDebug
-import com.example.rktec_middleware.ui.screens.TelaMapeamentoPlanilha
+import com.example.rktec_middleware.ui.screens.TelaLogin
 import com.example.rktec_middleware.ui.screens.TelaSobre
 import kotlinx.coroutines.launch
 
@@ -36,11 +37,55 @@ class MainActivity : ComponentActivity() {
 
         val appDatabase = AppDatabase.getInstance(applicationContext)
 
+
         setContent {
+            // -------- ESTADOS DO CICLO DE TELAS --------
+            var isLoggedIn by remember { mutableStateOf(false) }
+            var mapeamentoConcluido by remember { mutableStateOf(false) }
             var telaAtual by remember { mutableStateOf("menu") }
             var uriParaMapeamento by remember { mutableStateOf<Uri?>(null) }
-            var refreshInventario by remember { mutableStateOf(0) }
             val scope = rememberCoroutineScope()
+            var refreshDebug by remember { mutableStateOf(0) }
+            var usuario by remember { mutableStateOf("") }
+            var filtroLoja by remember { mutableStateOf<String?>(null) }
+            var filtroSetor by remember { mutableStateOf<String?>(null) }
+            var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+            var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+
+
+            if (!isLoggedIn) {
+                TelaLogin(
+                    onLoginSucesso = { nome ->
+                        usuario = nome
+                        isLoggedIn = true
+                        scope.launch {
+                            val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
+                            mapeamentoConcluido = mapeamento != null
+                        }
+                    },
+                    onSobreClick = { telaAtual = "sobre" }
+                )
+                return@setContent
+            }
+
+
+            if (!mapeamentoConcluido) {
+                TelaImportacao(
+                    onConcluido = {
+                        mapeamentoConcluido = true
+                        refreshDebug++
+                        telaAtual = "menu"
+                    },
+                    appDatabase = appDatabase,
+                    usuario = usuario,
+                    onDebugClick = { telaAtual = "debug" },
+                    onSobreClick = { telaAtual = "sobre" }
+                )
+
+                return@setContent
+            }
+
+
 
 
             when (telaAtual) {
@@ -56,37 +101,35 @@ class MainActivity : ComponentActivity() {
                 )
                 "inventario" -> TelaInventario(
                     onVoltar = { telaAtual = "menu" },
-                    onIniciarLeituraInventario = { telaAtual = "leituraInventario" }
+                    onIniciarLeituraInventario = { loja, setor, total, filtrada ->
+                        filtroLoja = loja
+                        filtroSetor = setor
+                        listaTotal = total
+                        listaFiltrada = filtrada
+                        telaAtual = "leituraInventario"
+                    },
+                    onDebugClick = { telaAtual = "debug" },
+                    onSobreClick = { telaAtual = "sobre" }
                 )
 
-                "mapeamento" -> {
-                    uriParaMapeamento?.let { uri ->
-                        TelaMapeamentoPlanilha(
-                            uri = uri,
-                            onSalvar = { mapeamento ->
-                                // Agora usa scope.launch!
-                                scope.launch {
-                                    appDatabase.mapeamentoDao().inserir(mapeamento)
-                                    telaAtual = "inventario"
-                                    refreshInventario++
-                                    uriParaMapeamento = null
-                                }
-                            },
-                            onCancelar = {
-                                telaAtual = "inventario"
-                                uriParaMapeamento = null
-                            }
-                        )
-                    }
-                }
                 "leituraInventario" -> TelaLeituraInventario(
                     onVoltar = { telaAtual = "menu" },
-                    banco = appDatabase
+                    banco = appDatabase,
+                    listaFiltrada = listaFiltrada,
+                    listaTotal = listaTotal,
+                    filtroLoja = filtroLoja,
+                    filtroSetor = filtroSetor
                 )
                 "debug" -> TelaDebug(
                     banco = appDatabase,
-                    onVoltar = { telaAtual = "menu" }
+                    refresh = refreshDebug,
+                    onVoltar = { telaAtual = "menu" },
+                    onBancoLimpo = {
+                        mapeamentoConcluido = false
+                        telaAtual = "menu"
+                    }
                 )
+
                 "sobre" -> TelaSobre(
                     onVoltar = { telaAtual = "menu" }
                 )

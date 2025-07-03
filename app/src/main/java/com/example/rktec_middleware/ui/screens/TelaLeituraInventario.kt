@@ -8,7 +8,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.db.AppDatabase
+import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.viewmodel.RfidViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +32,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun TelaLeituraInventario(
     onVoltar: () -> Unit,
-    banco: AppDatabase
+    banco: AppDatabase,
+    listaFiltrada: List<ItemInventario>,
+    listaTotal: List<ItemInventario>,
+    filtroLoja: String?,
+    filtroSetor: String?
 ) {
     val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<RfidViewModel>()
     val tags by viewModel.tagList.collectAsState()
@@ -38,6 +47,7 @@ fun TelaLeituraInventario(
             .background(Color.White)
             .padding(top = 32.dp, bottom = 24.dp)
     ) {
+        // CABEÇALHO - gradiente + botão voltar + título
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -53,8 +63,7 @@ fun TelaLeituraInventario(
                 onClick = onVoltar,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 8.dp)
-                    .padding(top = 32.dp)
+                    .padding(start = 8.dp, top = 32.dp)
                     .size(48.dp)
             ) {
                 Icon(
@@ -64,7 +73,6 @@ fun TelaLeituraInventario(
                     modifier = Modifier.size(32.dp)
                 )
             }
-
             Text(
                 "INVENTÁRIO",
                 color = Color.White,
@@ -119,18 +127,51 @@ fun TelaLeituraInventario(
                         .padding(8.dp)
                 ) {
                     items(tags) { tag ->
+                        val status = statusTag(
+                            tag.epc,
+                            filtroLoja,
+                            filtroSetor,
+                            listaFiltrada,
+                            listaTotal
+                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = "Tag",
-                                tint = Color(0xFF4A90E2),
+                                imageVector = when (status) {
+                                    "verde" -> Icons.Filled.CheckCircle
+                                    "amarelo" -> Icons.Filled.Warning
+                                    "cinza" -> Icons.Filled.Info
+                                    else -> Icons.Filled.Error
+                                },
+                                contentDescription = "Status",
+                                tint = when (status) {
+                                    "verde" -> Color(0xFF2E7D32)
+                                    "amarelo" -> Color(0xFFFFC107)
+                                    "cinza" -> Color.Gray
+                                    else -> Color.Red
+                                },
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text(tag.epc, fontSize = 16.sp)
+                            Text(
+                                tag.epc,
+                                fontSize = 16.sp,
+                                color = when (status) {
+                                    "verde" -> Color(0xFF2E7D32)
+                                    "amarelo" -> Color(0xFFFFA000)
+                                    "cinza" -> Color.Gray
+                                    else -> Color.Red
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = status.replaceFirstChar { it.uppercase() },
+                                color = Color.DarkGray,
+                                fontSize = 14.sp
+                            )
                         }
                         Divider()
                     }
@@ -143,21 +184,42 @@ fun TelaLeituraInventario(
         Button(
             onClick = {
                 CoroutineScope(Dispatchers.IO).launch {
-                    val dao = banco.coletaDao()
-                    dao.inserirTodos(tags)
-                    Log.d("LeituraInventario", "Salvo ${tags.size} tags no banco.")
+                    banco.coletaDao().inserirTodos(tags)
                 }
+                // Você pode chamar onVoltar() aqui se quiser fechar a tela
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .padding(horizontal = 8.dp),
             shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
         ) {
             Text("Finalizar Inventário", fontSize = 20.sp, color = Color.White)
         }
 
         Spacer(modifier = Modifier.height(20.dp))
     }
+}
+/**
+ * Determina o status visual de cada tag lida, conforme o filtro ativo e inventário completo
+ */
+fun statusTag(
+    epc: String,
+    filtroLoja: String?,
+    filtroSetor: String?,
+    listaFiltrada: List<ItemInventario>,
+    listaTotal: List<ItemInventario>
+): String {
+    // VERDE: Está no filtro (loja e setor selecionados)
+    if (listaFiltrada.any { it.tag == epc }) return "verde"
+
+    // AMARELO: Está na loja filtrada, mas em outro setor
+    if (filtroLoja != null && listaTotal.any { it.tag == epc && it.loja == filtroLoja }) return "amarelo"
+
+    // CINZA: Está em outra loja ou setor da planilha
+    if (listaTotal.any { it.tag == epc }) return "cinza"
+
+    // VERMELHO: Não está na planilha
+    return "vermelho"
 }

@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.rktec_middleware.data.dao.LogMapeamentoDao
+import com.example.rktec_middleware.data.model.LogMapeamento
 import com.example.rktec_middleware.data.dao.ColetaDao
 import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
@@ -14,12 +14,15 @@ import com.example.rktec_middleware.data.dao.MapeamentoDao
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 
 
-@Database(entities = [ItemInventario::class, EpcTag::class, MapeamentoPlanilha::class], version = 7)
-
+@Database(
+    entities = [ItemInventario::class, EpcTag::class, MapeamentoPlanilha::class, LogMapeamento::class],
+    version = 8
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
     abstract fun coletaDao(): ColetaDao
     abstract fun mapeamentoDao(): MapeamentoDao
+    abstract fun logMapeamentoDao(): LogMapeamentoDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -33,8 +36,8 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .fallbackToDestructiveMigration()
                     .build()
-
             }
         }
     }
 }
+

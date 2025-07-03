@@ -26,37 +26,26 @@ import java.util.*
 @Composable
 fun TelaDebug(
     banco: AppDatabase,
-    onVoltar: () -> Unit
+    refresh: Int,
+    onVoltar: () -> Unit,
+    onBancoLimpo: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var epcs by remember { mutableStateOf<List<EpcTag>>(emptyList()) }
     var mostrarDialogLimparBanco by remember { mutableStateOf(false) }
 
-    // Carrega as tags do banco
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refresh) {
         scope.launch {
             epcs = banco.coletaDao().listarTodas()
         }
     }
-
-    // Função para limpar o banco e atualizar a lista
-    fun limparBanco() {
-        scope.launch {
-            banco.coletaDao().limparColetas()
-            banco.inventarioDao().limparInventario()
-            banco.mapeamentoDao().deletarTudo()
-            epcs = emptyList()
-        }
-    }
-
-
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // Cabeçalho estiloso
+        // Cabeçalho
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -90,7 +79,6 @@ fun TelaDebug(
                 modifier = Modifier.align(Alignment.Center)
             )
 
-            // Botão de limpar banco
             TextButton(
                 onClick = { mostrarDialogLimparBanco = true },
                 modifier = Modifier
@@ -103,7 +91,7 @@ fun TelaDebug(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Card estiloso central
+        // Card central
         Card(
             shape = RoundedCornerShape(18.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 7.dp),
@@ -125,7 +113,9 @@ fun TelaDebug(
 
                 if (epcs.isEmpty()) {
                     Box(
-                        Modifier.fillMaxWidth().padding(18.dp),
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("Nenhuma tag salva ainda.", color = Color.Gray)
@@ -170,7 +160,6 @@ fun TelaDebug(
                                         }
                                     }
                                 }
-                                // --- BLOCO DA LOJA ---
                                 if (tag.loja?.isNotBlank() == true) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -194,11 +183,10 @@ fun TelaDebug(
                             }
                         }
                     }
-
-
                 }
             }
         }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // Dialog de confirmação
@@ -228,6 +216,7 @@ fun TelaDebug(
                                 banco.coletaDao().limparColetas()
                                 banco.mapeamentoDao().deletarTudo()
                                 epcs = emptyList()
+                                onBancoLimpo() // CHAMA O CALLBACK AQUI!
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
@@ -244,7 +233,6 @@ fun TelaDebug(
                 }
             )
         }
-
     }
 }
 

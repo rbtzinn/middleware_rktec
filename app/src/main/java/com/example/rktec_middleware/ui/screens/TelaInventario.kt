@@ -1,291 +1,408 @@
 package com.example.rktec_middleware.ui.screens
 
-import android.net.Uri
-import android.webkit.MimeTypeMap
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
-import com.example.rktec_middleware.data.model.EpcTag
-import com.example.rktec_middleware.util.LeitorInventario
-import com.airbnb.lottie.compose.*
-import kotlinx.coroutines.launch
 
 @Composable
 fun TelaInventario(
     onVoltar: () -> Unit,
-    onIniciarLeituraInventario: () -> Unit
+    onIniciarLeituraInventario: (
+        filtroLoja: String?,
+        filtroSetor: String?,
+        listaTotal: List<ItemInventario>,
+        listaFiltrada: List<ItemInventario>
+    ) -> Unit,
+    onDebugClick: () -> Unit,
+    onSobreClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val db = remember { AppDatabase.getInstance(context) }
 
-    var nomeArquivo by remember { mutableStateOf<String?>(null) }
     var dadosImportados by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var erroImportacao by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableStateOf(0) }
-    var uriParaMapeamento by remember { mutableStateOf<Uri?>(null) }
-    var mostrarTelaMapeamento by remember { mutableStateOf(false) }
 
-    // Busca do banco ao montar ou quando refresh muda
+    var filtroLoja by remember { mutableStateOf<String?>(null) }
+    var filtroSetor by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(refresh) {
         val dadosSalvos = db.inventarioDao().listarTodos()
-        if (dadosSalvos.isNotEmpty()) {
-            dadosImportados = dadosSalvos
-            nomeArquivo = "Dados recuperados do banco"
-        } else {
-            dadosImportados = emptyList()
-            nomeArquivo = null
-        }
+        dadosImportados = if (dadosSalvos.isNotEmpty()) dadosSalvos else emptyList()
     }
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri: Uri? ->
-            uri?.let {
-                scope.launch {
-                    isLoading = true
-                    erroImportacao = null
-                    nomeArquivo = it.lastPathSegment
+    val lojas = dadosImportados.map { it.loja }.filter { it.isNotBlank() }.distinct()
+    val setores = dadosImportados.map { it.localizacao }.filter { it.isNotBlank() }.distinct()
 
-                    // Busca mapeamento salvo
-                    val mapeamento = db.mapeamentoDao().buscarPrimeiro()
-                    if (mapeamento == null) {
-                        // Não tem mapeamento: abre tela de mapeamento e já importa na volta
-                        uriParaMapeamento = it
-                        mostrarTelaMapeamento = true
-                        isLoading = false
-                        return@launch
-                    }
-
-                    // Já tem mapeamento: lê e importa direto
-                    val contentResolver = context.contentResolver
-                    val mime = contentResolver.getType(it) ?: ""
-                    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)?.lowercase()
-                        ?: it.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
-                        ?: ""
-
-                    val lista = when (extension) {
-                        "csv" -> LeitorInventario.lerCsv(context, it, mapeamento)
-                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, it, mapeamento)
-                        else -> emptyList()
-                    }
-
-                    if (lista.isNotEmpty()) {
-                        db.inventarioDao().inserirTodos(lista)
-                        val epcTags = lista.map { item ->
-                            EpcTag(
-                                epc = item.tag,
-                                descricao = item.desc,
-                                setor = item.localizacao,
-                                loja = item.loja
-                            )
-                        }
-                        db.coletaDao().inserirTodos(epcTags)
-                        dadosImportados = lista
-                        nomeArquivo = it.lastPathSegment
-                        refresh++
-                    } else {
-                        erroImportacao = "Planilha inválida!\nVerifique se tem as colunas necessárias."
-                        dadosImportados = emptyList()
-                        nomeArquivo = null
-                    }
-                    isLoading = false
-                }
-            }
-        }
-    )
-
-    // Tela de mapeamento, se precisar
-    if (mostrarTelaMapeamento && uriParaMapeamento != null) {
-        TelaMapeamentoPlanilha(
-            uri = uriParaMapeamento!!,
-            onSalvar = { mapeamento ->
-                scope.launch {
-                    db.mapeamentoDao().inserir(mapeamento)
-
-                    // Importa já no callback
-                    val contentResolver = context.contentResolver
-                    val mime = contentResolver.getType(uriParaMapeamento!!) ?: ""
-                    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)?.lowercase()
-                        ?: uriParaMapeamento!!.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
-                        ?: ""
-
-                    val lista = when (extension) {
-                        "csv" -> LeitorInventario.lerCsv(context, uriParaMapeamento!!, mapeamento)
-                        "xls", "xlsx" -> LeitorInventario.lerExcel(context, uriParaMapeamento!!, mapeamento)
-                        else -> emptyList()
-                    }
-
-                    if (lista.isNotEmpty()) {
-                        db.inventarioDao().inserirTodos(lista)
-                        val epcTags = lista.map { item ->
-                            EpcTag(
-                                epc = item.tag,
-                                descricao = item.desc,
-                                setor = item.localizacao,
-                                loja = item.loja
-                            )
-                        }
-                        db.coletaDao().inserirTodos(epcTags)
-                        dadosImportados = lista
-                        nomeArquivo = uriParaMapeamento!!.lastPathSegment
-                        refresh++
-                        mostrarTelaMapeamento = false
-                    } else {
-                        erroImportacao = "Planilha inválida!\nVerifique se tem as colunas necessárias."
-                        dadosImportados = emptyList()
-                        nomeArquivo = null
-                        mostrarTelaMapeamento = false
-                    }
-                }
-            },
-            onCancelar = {
-                mostrarTelaMapeamento = false
-                uriParaMapeamento = null
-            }
-        )
-        return // Não desenha mais nada da TelaInventario quando estiver na tela de mapeamento!
+    val listaFiltrada = dadosImportados.filter { item ->
+        (filtroLoja.isNullOrEmpty() || item.loja == filtroLoja) &&
+                (filtroSetor.isNullOrEmpty() || item.localizacao == filtroSetor)
     }
 
-    // ------ UI principal --------
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(top = 32.dp, bottom = 24.dp)
+            .background(Color(0xFFF8F9FC))
     ) {
+        // Cabeçalho com gradiente profissional
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
-                .offset(y = -32.dp)
+                .height(72.dp)
                 .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF4A90E2), Color(0xFF174D86))
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF1A6DB0),
+                            Color(0xFF0D4A82),
+                            Color(0xFF083A6C)
+                        )
                     )
                 ),
             contentAlignment = Alignment.Center
         ) {
-            IconButton(
-                onClick = onVoltar,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 8.dp, top = 32.dp)
-                    .size(48.dp)
+            Row(
+                Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                IconButton(
+                    onClick = onVoltar,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowBack,
+                        contentDescription = "Voltar",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Text(
+                    "INVENTÁRIO",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
                 )
             }
-
-            Text(
-                "INVENTÁRIO",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 32.dp)
-            )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Column(
+        // Painel de filtros com sombra suave
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(12.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(16.dp)
+                ),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
+            Column(
+                modifier = Modifier.padding(12.dp)
+            ) {
+                Text(
+                    "Filtrar Itens",
+                    color = Color(0xFF0D4A82),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (lojas.isNotEmpty()) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            DropdownFiltroEstilizado(
+                                label = "Loja",
+                                opcoes = lojas,
+                                selecionado = filtroLoja,
+                                onSelecionado = { filtroLoja = it }
+                            )
+                        }
+                    }
+                    if (setores.isNotEmpty()) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            DropdownFiltroEstilizado(
+                                label = "Setor",
+                                opcoes = setores,
+                                selecionado = filtroSetor,
+                                onSelecionado = { filtroSetor = it }
+                            )
+                        }
+                    }
+                }
+                // Contagem itens com destaque
+                Text(
+                    "Itens: ${listaFiltrada.size} de ${dadosImportados.size}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = Color(0xFF1A6DB0),
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 8.dp)
+                )
+            }
+        }
+
+        // Lista de itens com cards modernos
+        if (dadosImportados.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Nenhum item de inventário encontrado",
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF6C757D),
+                    fontSize = 18.sp
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
+                items(listaFiltrada) { item ->
+                    ItemInventarioCard(item = item)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Botão principal com efeito visual
             Button(
-                onClick = { launcher.launch("*/*") },
+                onClick = {
+                    onIniciarLeituraInventario(
+                        filtroLoja,
+                        filtroSetor,
+                        dadosImportados,
+                        listaFiltrada
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp),
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = RoundedCornerShape(28.dp)
+                    ),
                 shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1A6DB0)
+                )
             ) {
-                Text("Selecionar Planilha (.csv ou .xls)", fontSize = 20.sp, color = Color.White)
-            }
-
-            nomeArquivo?.let {
-                Text("Arquivo selecionado: $it", fontSize = 16.sp, color = Color.Gray)
-            }
-
-            if (isLoading) {
-                val composition by rememberLottieComposition(LottieCompositionSpec.Asset("loading.json"))
-                val progress by animateLottieCompositionAsState(composition, isPlaying = true)
-                LottieAnimation(
-                    composition = composition,
-                    progress = { progress },
-                    modifier = Modifier.size(100.dp)
-                )
-                Text("Analisando planilha...", color = Color.Gray)
-            }
-
-            if (dadosImportados.isEmpty() && !isLoading) {
                 Text(
-                    "Nenhuma planilha importada.\nImporte uma planilha para começar.",
+                    "INICIAR LEITURA",
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray
+                    letterSpacing = 0.8.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Footer minimalista
+        Text(
+            "RKTECNOLOGIAS",
+            color = Color(0xFF6C757D),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .clickable(onClick = onSobreClick),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun ItemInventarioCard(item: ItemInventario) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(elevation = 2.dp, shape = RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+        ) {
+            Text(
+                text = item.tag,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color(0xFF212529),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            if (item.desc.isNotBlank()) {
+                Text(
+                    item.desc,
+                    fontSize = 14.sp,
+                    color = Color(0xFF495057),
+                    modifier = Modifier.padding(top = 4.dp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            if (dadosImportados.isNotEmpty() && !isLoading && erroImportacao == null) {
-                Button(
-                    onClick = { onIniciarLeituraInventario() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(70.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                ) {
-                    Text("Iniciar Leitura", fontSize = 20.sp, color = Color.White)
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (item.localizacao.isNotBlank()) {
+                    InfoChip("Setor: ${item.localizacao}")
+                }
+                if (item.loja.isNotBlank()) {
+                    InfoChip("Loja: ${item.loja}")
                 }
             }
         }
     }
+}
 
-    // ------ DIALOG DE ERRO ------
-    if (erroImportacao != null) {
-        AlertDialog(
-            onDismissRequest = {
-                erroImportacao = null
-                isLoading = false
-                dadosImportados = emptyList()
-                refresh++
-            },
-            title = { Text("Erro ao importar planilha", color = Color.Red, fontWeight = FontWeight.ExtraBold) },
-            text = { Text(erroImportacao ?: "") },
-            confirmButton = {
-                TextButton(onClick = {
-                    erroImportacao = null
-                    isLoading = false
-                    dadosImportados = emptyList()
-                    refresh++
-                }) {
-                    Text("Ok")
-                }
-            }
+@Composable
+fun InfoChip(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFE9ECEF))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = text,
+            color = Color(0xFF495057),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
         )
+    }
+}
+
+@Composable
+fun DropdownFiltroEstilizado(
+    label: String,
+    opcoes: List<String>,
+    selecionado: String?,
+    onSelecionado: (String?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val displayText = if (selecionado.isNullOrEmpty()) "Todos" else selecionado
+
+    Box(
+        modifier = Modifier
+            .height(52.dp)
+    ) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF1A6DB0)
+            ),
+            border = ButtonDefaults.outlinedButtonBorder.copy(
+                width = 1.2.dp
+            ),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        label,
+                        color = Color(0xFF6C757D),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                    Text(
+                        displayText,
+                        color = Color(0xFF212529),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = "Abrir filtro",
+                    tint = Color(0xFF6C757D)
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .widthIn(min = 200.dp)
+                .heightIn(max = 280.dp)
+                .background(Color.White)
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        "Todos",
+                        fontWeight = if (selecionado == null) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selecionado == null) Color(0xFF1A6DB0) else Color(0xFF212529)
+                    )
+                },
+                onClick = {
+                    onSelecionado(null)
+                    expanded = false
+                }
+            )
+            opcoes.forEach { opcao ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            opcao,
+                            fontWeight = if (selecionado == opcao) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selecionado == opcao) Color(0xFF1A6DB0) else Color(0xFF212529)
+                        )
+                    },
+                    onClick = {
+                        onSelecionado(opcao)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }

@@ -5,6 +5,8 @@ import android.webkit.MimeTypeMap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +25,7 @@ import java.io.InputStreamReader
 @Composable
 fun TelaMapeamentoPlanilha(
     uri: Uri,
-    onSalvar: (MapeamentoPlanilha) -> Unit,
+    onSalvar: (MapeamentoPlanilha, List<String>) -> Unit,
     onCancelar: () -> Unit
 ) {
     val context = LocalContext.current
@@ -33,7 +35,6 @@ fun TelaMapeamentoPlanilha(
     var indexSetor by remember { mutableStateOf<Int?>(null) }
     var indexLoja by remember { mutableStateOf<Int?>(null) }
 
-    // Carrega nomes das colunas ao montar
     LaunchedEffect(uri) {
         val fileName = uri.lastPathSegment ?: ""
         val contentResolver = context.contentResolver
@@ -41,48 +42,35 @@ fun TelaMapeamentoPlanilha(
         val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)?.lowercase()
             ?: fileName.substringAfterLast('.', "").lowercase()
             ?: ""
-        println("DEBUG: Arquivo selecionado: $fileName, extensão detectada: $extension, mime: $mime")
-
         val inputStream = contentResolver.openInputStream(uri)
         val colunasDetectadas = when (extension) {
             "csv" -> {
                 val reader = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
-                // Pula linhas em branco até encontrar a primeira não vazia
                 var primeiraLinha: String? = null
                 while (primeiraLinha == null && reader.ready()) {
                     val linha = reader.readLine()
                     if (linha != null && linha.isNotBlank()) primeiraLinha = linha
                 }
-                if (primeiraLinha == null) {
-                    println("CSV: NENHUMA LINHA ENCONTRADA NO CABEÇALHO!")
-                    emptyList()
-                } else {
+                if (primeiraLinha == null) emptyList()
+                else {
                     val delimitadores = listOf(";", ",", "\t", "|")
                     val melhorDelim = delimitadores.maxByOrNull { primeiraLinha.count { ch -> ch == it[0] } } ?: ","
-                    val cols = primeiraLinha.split(melhorDelim)
+                    primeiraLinha.split(melhorDelim)
                         .map { it.trim().replace("\"", "") }
                         .filter { it.isNotBlank() }
-                    println("CSV: Colunas detectadas: $cols")
-                    cols
                 }
             }
             "xls", "xlsx" -> {
                 val workbook = WorkbookFactory.create(inputStream)
                 val sheet = workbook.getSheetAt(0)
                 val headerRow = sheet.getRow(0)
-                val cols = headerRow?.map { it.toString().trim() }?.filter { it.isNotBlank() } ?: emptyList()
-                println("EXCEL: Colunas detectadas: $cols")
-                cols
+                headerRow?.map { it.toString().trim() }?.filter { it.isNotBlank() } ?: emptyList()
             }
-            else -> {
-                println("Arquivo sem extensão suportada: $extension")
-                emptyList()
-            }
+            else -> emptyList()
         }
         colunas = colunasDetectadas
     }
 
-    // ---- UI estilizada padrão RKTEC ----
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -121,37 +109,17 @@ fun TelaMapeamentoPlanilha(
         ) {
             Text("Selecione qual coluna representa cada campo:", fontWeight = FontWeight.Bold)
 
-            // EPC - Obrigatório
             Text("Coluna do EPC *", fontWeight = FontWeight.Medium)
-            DropdownMenuCampo(
-                colunas = colunas,
-                selecionado = indexEpc,
-                onSelecionado = { indexEpc = it }
-            )
+            DropdownMenuCampo(colunas, indexEpc) { indexEpc = it }
 
-            // Nome - Opcional
             Text("Coluna do Nome (opcional)", fontWeight = FontWeight.Medium)
-            DropdownMenuCampo(
-                colunas = colunas,
-                selecionado = indexNome,
-                onSelecionado = { indexNome = it }
-            )
+            DropdownMenuCampo(colunas, indexNome) { indexNome = it }
 
-            // Setor - Opcional
             Text("Coluna do Setor (opcional)", fontWeight = FontWeight.Medium)
-            DropdownMenuCampo(
-                colunas = colunas,
-                selecionado = indexSetor,
-                onSelecionado = { indexSetor = it }
-            )
+            DropdownMenuCampo(colunas, indexSetor) { indexSetor = it }
 
-            // Loja - Opcional
             Text("Coluna da Loja (opcional)", fontWeight = FontWeight.Medium)
-            DropdownMenuCampo(
-                colunas = colunas,
-                selecionado = indexLoja,
-                onSelecionado = { indexLoja = it }
-            )
+            DropdownMenuCampo(colunas, indexLoja) { indexLoja = it }
 
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -162,20 +130,25 @@ fun TelaMapeamentoPlanilha(
                     onClick = {
                         onSalvar(
                             MapeamentoPlanilha(
-                                usuario = "", // preenche se usar login
+                                usuario = "",
                                 nomeArquivo = uri.lastPathSegment ?: "",
                                 colunaEpc = indexEpc!!,
                                 colunaNome = indexNome,
                                 colunaSetor = indexSetor,
                                 colunaLoja = indexLoja
-                            )
+                            ),
+                            colunas
                         )
                     }
-                ) { Text("Salvar", fontSize = 18.sp, color = Color.White) }
+                ) {
+                    Text("Salvar", fontSize = 18.sp, color = Color.White)
+                }
                 OutlinedButton(
                     shape = RoundedCornerShape(28.dp),
                     onClick = onCancelar
-                ) { Text("Cancelar", fontSize = 18.sp) }
+                ) {
+                    Text("Cancelar", fontSize = 18.sp)
+                }
             }
         }
     }
@@ -188,23 +161,61 @@ fun DropdownMenuCampo(
     onSelecionado: (Int?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val displayText = if (selecionado != null && selecionado in colunas.indices) colunas[selecionado] else "Selecione"
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .wrapContentSize(Alignment.TopStart)
     ) {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF1A6DB0)
+            ),
+            border = ButtonDefaults.outlinedButtonBorder.copy(
+                width = 1.dp
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
         ) {
-            Text(
-                if (selecionado != null && selecionado in colunas.indices) colunas[selecionado] else "Selecione"
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = displayText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF212529),
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = "Abrir menu",
+                    tint = Color(0xFF6C757D)
+                )
+            }
         }
+
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 300.dp) // LIMITA ALTURA!
+                .background(Color.White)
         ) {
+            DropdownMenuItem(
+                text = { Text("Nenhum") },
+                onClick = {
+                    onSelecionado(null)
+                    expanded = false
+                }
+            )
             colunas.forEachIndexed { idx, col ->
                 DropdownMenuItem(
                     text = { Text(col) },
@@ -214,13 +225,7 @@ fun DropdownMenuCampo(
                     }
                 )
             }
-            DropdownMenuItem(
-                text = { Text("Nenhum") },
-                onClick = {
-                    onSelecionado(null)
-                    expanded = false
-                }
-            )
         }
     }
 }
+
