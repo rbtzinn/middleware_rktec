@@ -12,17 +12,25 @@ import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.data.dao.MapeamentoDao
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
-
+import com.example.rktec_middleware.data.model.Usuario    // <-- importa o Usuario
+import com.example.rktec_middleware.data.dao.UsuarioDao  // <-- importa o UsuarioDao
 
 @Database(
-    entities = [ItemInventario::class, EpcTag::class, MapeamentoPlanilha::class, LogMapeamento::class],
-    version = 8
+    entities = [
+        ItemInventario::class,
+        EpcTag::class,
+        MapeamentoPlanilha::class,
+        LogMapeamento::class,
+        Usuario::class
+    ],
+    version = 9
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
     abstract fun coletaDao(): ColetaDao
     abstract fun mapeamentoDao(): MapeamentoDao
     abstract fun logMapeamentoDao(): LogMapeamentoDao
+    abstract fun usuarioDao(): UsuarioDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -36,8 +44,8 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                     .fallbackToDestructiveMigration()
                     .build()
+                    .also { INSTANCE = it }
             }
         }
     }
 }
-

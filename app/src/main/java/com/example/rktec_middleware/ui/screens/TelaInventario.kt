@@ -1,15 +1,18 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,10 +22,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
 
@@ -52,337 +55,319 @@ fun TelaInventario(
         dadosImportados = if (dadosSalvos.isNotEmpty()) dadosSalvos else emptyList()
     }
 
-    val lojas = dadosImportados.map { it.loja }.filter { it.isNotBlank() }.distinct()
-    val setores = dadosImportados.map { it.localizacao }.filter { it.isNotBlank() }.distinct()
+    val lojas = dadosImportados
+        .map { it.loja.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+
+    val setores = dadosImportados
+        .map { it.localizacao.trim() }
+        .filter { it.isNotBlank() }
+        .map {
+            it.toDoubleOrNull()?.let { d ->
+                if (d % 1.0 == 0.0) d.toInt().toString() else it
+            } ?: it
+        }
+        .distinct()
 
     val listaFiltrada = dadosImportados.filter { item ->
-        (filtroLoja.isNullOrEmpty() || item.loja == filtroLoja) &&
-                (filtroSetor.isNullOrEmpty() || item.localizacao == filtroSetor)
+        (filtroLoja.isNullOrEmpty() || item.loja.trim() == filtroLoja) &&
+                (filtroSetor.isNullOrEmpty() || (item.localizacao.trim().toDoubleOrNull()?.let { d -> if (d % 1.0 == 0.0) d.toInt().toString() else item.localizacao.trim() } ?: item.localizacao.trim()) == filtroSetor)
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FC))
+            .background(Color(0xFFF5F7FA))
     ) {
-        // Cabeçalho com gradiente profissional
+        // Header moderno
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.dp)
+                .height(110.dp)
                 .background(
                     Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF1A6DB0),
-                            Color(0xFF0D4A82),
-                            Color(0xFF083A6C)
-                        )
+                        0f to Color(0xFF174D86),
+                        1f to Color(0xFF4A90E2)
                     )
-                ),
-            contentAlignment = Alignment.Center
+                )
         ) {
             Row(
-                Modifier.fillMaxSize(),
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onVoltar,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.White.copy(alpha = 0.20f), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.ArrowBack,
+                        Icons.Filled.ArrowBack,
                         contentDescription = "Voltar",
                         tint = Color.White,
                         modifier = Modifier.size(28.dp)
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "INVENTÁRIO",
+                    "Inventário",
                     color = Color.White,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp,
                     modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    letterSpacing = 0.5.sp
                 )
+                Spacer(modifier = Modifier.width(44.dp))
             }
         }
 
-        // Painel de filtros com sombra suave
+        // Painel de filtro compacto
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(16.dp)
-                ),
-            shape = RoundedCornerShape(16.dp),
+                .offset(y = (-26).dp)
+                .padding(horizontal = 18.dp)
+                .shadow(elevation = 7.dp, shape = RoundedCornerShape(18.dp)),
+            shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
             Column(
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    "Filtrar Itens",
-                    color = Color(0xFF0D4A82),
+                    "Filtros rápidos",
+                    color = Color(0xFF174D86),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(bottom = 7.dp)
                 )
-
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (lojas.isNotEmpty()) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            DropdownFiltroEstilizado(
-                                label = "Loja",
-                                opcoes = lojas,
-                                selecionado = filtroLoja,
-                                onSelecionado = { filtroLoja = it }
-                            )
-                        }
-                    }
-                    if (setores.isNotEmpty()) {
-                        Box(modifier = Modifier.weight(1f)) {
-                            DropdownFiltroEstilizado(
-                                label = "Setor",
-                                opcoes = setores,
-                                selecionado = filtroSetor,
-                                onSelecionado = { filtroSetor = it }
-                            )
-                        }
-                    }
+                    DropdownFiltroProfissional(
+                        label = "Loja",
+                        opcoes = lojas,
+                        selecionado = filtroLoja,
+                        onSelecionado = { filtroLoja = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    DropdownFiltroProfissional(
+                        label = "Setor",
+                        opcoes = setores,
+                        selecionado = filtroSetor,
+                        onSelecionado = { filtroSetor = it },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                // Contagem itens com destaque
+
                 Text(
-                    "Itens: ${listaFiltrada.size} de ${dadosImportados.size}",
+                    "Itens: ${listaFiltrada.size} / ${dadosImportados.size}",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = Color(0xFF1A6DB0),
+                    fontSize = 14.sp,
+                    color = Color(0xFF4A90E2),
                     modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
+                        .align(Alignment.End)
                         .padding(top = 8.dp)
                 )
             }
         }
 
-        // Lista de itens com cards modernos
-        if (dadosImportados.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Nenhum item de inventário encontrado",
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF6C757D),
-                    fontSize = 18.sp
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-            ) {
-                items(listaFiltrada) { item ->
-                    ItemInventarioCard(item = item)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Botão principal com efeito visual
-            Button(
-                onClick = {
-                    onIniciarLeituraInventario(
-                        filtroLoja,
-                        filtroSetor,
-                        dadosImportados,
-                        listaFiltrada
+        // Conteúdo da lista de inventário
+        Box(
+            Modifier
+                .weight(1f)
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 0.dp)
+        ) {
+            if (dadosImportados.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Nenhum item de inventário encontrado",
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF9CA3AF),
+                        fontSize = 17.sp,
+                        textAlign = TextAlign.Center
                     )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 16.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = RoundedCornerShape(28.dp)
-                    ),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF1A6DB0)
-                )
-            ) {
-                Text(
-                    "INICIAR LEITURA",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp
-                )
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(listaFiltrada) { item ->
+                        ItemInventarioCardNovo(item)
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        // Botão principal na base (float)
+        if (dadosImportados.isNotEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Button(
+                    onClick = {
+                        onIniciarLeituraInventario(
+                            filtroLoja,
+                            filtroSetor,
+                            dadosImportados,
+                            listaFiltrada
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
+                ) {
+                    Text(
+                        "Iniciar Leitura",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
 
         // Footer minimalista
         Text(
             "RKTECNOLOGIAS",
-            color = Color(0xFF6C757D),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
+            color = Color(0xFF009688),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp)
+                .padding(bottom = 10.dp)
                 .clickable(onClick = onSobreClick),
             textAlign = TextAlign.Center
         )
     }
 }
 
+// Card modernizado para item do inventário
 @Composable
-fun ItemInventarioCard(item: ItemInventario) {
+fun ItemInventarioCardNovo(item: ItemInventario) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 2.dp, shape = RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
+            .shadow(elevation = 3.dp, shape = RoundedCornerShape(14.dp)),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(
-            modifier = Modifier
-                .padding(16.dp)
+            modifier = Modifier.padding(vertical = 13.dp, horizontal = 18.dp)
         ) {
+            Text(
+                text = item.desc.ifBlank { "Sem descrição" },
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                color = Color(0xFF222222),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 text = item.tag,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = Color(0xFF212529),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                fontSize = 13.sp,
+                color = Color(0xFF4A90E2),
+                modifier = Modifier.padding(top = 2.dp)
             )
-
-            if (item.desc.isNotBlank()) {
-                Text(
-                    item.desc,
-                    fontSize = 14.sp,
-                    color = Color(0xFF495057),
-                    modifier = Modifier.padding(top = 4.dp),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
             Row(
-                modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                Modifier
+                    .padding(top = 8.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 if (item.localizacao.isNotBlank()) {
-                    InfoChip("Setor: ${item.localizacao}")
+                    InfoChipNovo("Setor: ${item.localizacao}")
                 }
                 if (item.loja.isNotBlank()) {
-                    InfoChip("Loja: ${item.loja}")
+                    InfoChipNovo("Loja: ${item.loja}")
                 }
             }
         }
     }
 }
 
+// Chip info padronizado (clean)
 @Composable
-fun InfoChip(text: String) {
+fun InfoChipNovo(text: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFE9ECEF))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .background(Color(0xFFE9F2FA))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,
-            color = Color(0xFF495057),
+            color = Color(0xFF1A6DB0),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
         )
     }
 }
 
+// Dropdown clean e compacto
 @Composable
-fun DropdownFiltroEstilizado(
+fun DropdownFiltroProfissional(
     label: String,
     opcoes: List<String>,
     selecionado: String?,
-    onSelecionado: (String?) -> Unit
+    onSelecionado: (String?) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     val displayText = if (selecionado.isNullOrEmpty()) "Todos" else selecionado
 
-    Box(
-        modifier = Modifier
-            .height(52.dp)
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
     ) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFF1A6DB0)
+        OutlinedTextField(
+            value = displayText,
+            onValueChange = {},
+            label = { Text(label, fontSize = 12.sp, color = Color(0xFF174D86)) },
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier
+                .menuAnchor()
+                .height(54.dp) // Altura menor!
+                .clip(RoundedCornerShape(10.dp)),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedBorderColor = Color(0xFFE0E0E0),
+                focusedBorderColor = Color(0xFF4A90E2),
+                focusedLabelColor = Color(0xFF174D86),
+                cursorColor = Color.Transparent,
+                disabledBorderColor = Color(0xFFE0E0E0),
+                unfocusedContainerColor = Color.White
             ),
-            border = ButtonDefaults.outlinedButtonBorder.copy(
-                width = 1.2.dp
-            ),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        label,
-                        color = Color(0xFF6C757D),
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                    Text(
-                        displayText,
-                        color = Color(0xFF212529),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Icon(
-                    imageVector = Icons.Filled.ArrowDropDown,
-                    contentDescription = "Abrir filtro",
-                    tint = Color(0xFF6C757D)
-                )
-            }
-        }
-
-        DropdownMenu(
+            singleLine = true,
+            textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
+        )
+        ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier
-                .widthIn(min = 200.dp)
-                .heightIn(max = 280.dp)
                 .background(Color.White)
+                .widthIn(min = 110.dp, max = 220.dp)
         ) {
             DropdownMenuItem(
-                text = {
-                    Text(
-                        "Todos",
-                        fontWeight = if (selecionado == null) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selecionado == null) Color(0xFF1A6DB0) else Color(0xFF212529)
-                    )
-                },
+                text = { Text("Todos", fontWeight = if (selecionado == null) FontWeight.Bold else FontWeight.Normal) },
                 onClick = {
                     onSelecionado(null)
                     expanded = false
@@ -390,13 +375,7 @@ fun DropdownFiltroEstilizado(
             )
             opcoes.forEach { opcao ->
                 DropdownMenuItem(
-                    text = {
-                        Text(
-                            opcao,
-                            fontWeight = if (selecionado == opcao) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selecionado == opcao) Color(0xFF1A6DB0) else Color(0xFF212529)
-                        )
-                    },
+                    text = { Text(opcao, fontWeight = if (selecionado == opcao) FontWeight.Bold else FontWeight.Normal) },
                     onClick = {
                         onSelecionado(opcao)
                         expanded = false

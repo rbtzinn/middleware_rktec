@@ -14,4 +14,8 @@ interface ColetaDao {
 
     @Query("DELETE FROM coletas")
     suspend fun limparColetas()
+
+    @Update
+    suspend fun atualizarTag(tag: EpcTag)
 }
+

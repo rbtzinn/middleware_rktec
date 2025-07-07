@@ -16,5 +16,9 @@ interface InventarioDao {
 
     @Query("DELETE FROM inventario")
     suspend fun limparInventario()
+
+    @Update
+    suspend fun atualizarItem(item: ItemInventario)
+
 }
 

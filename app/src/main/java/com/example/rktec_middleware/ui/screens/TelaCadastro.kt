@@ -13,31 +13,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rktec_middleware.data.model.Usuario
-import com.example.rktec_middleware.viewmodel.LoginState
-import com.example.rktec_middleware.viewmodel.LoginViewModel
+import com.example.rktec_middleware.viewmodel.CadastroState
+import com.example.rktec_middleware.viewmodel.CadastroViewModel
 
 @Composable
-fun TelaLogin(
-    onLoginSucesso: (Usuario) -> Unit,
-    onEsqueciSenha: (String) -> Unit,
-    onIrParaCadastro: () -> Unit,
-    viewModel: LoginViewModel
+fun TelaCadastro(
+    cadastroViewModel: CadastroViewModel,
+    aoCadastroSucesso: () -> Unit,
+    aoVoltarLogin: () -> Unit
 ) {
-    val loginState by viewModel.loginState.collectAsState()
+    val cadastroState by cadastroViewModel.cadastroState.collectAsState()
+    var nome by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
-    var mostrarErro by remember { mutableStateOf(false) }
-    var erroMsg by remember { mutableStateOf("") }
+    var confirmacao by remember { mutableStateOf("") }
+    var mostrarErro by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(loginState) {
-        when (loginState) {
-            is LoginState.Sucesso -> {
-                onLoginSucesso((loginState as LoginState.Sucesso).usuario)
+    LaunchedEffect(cadastroState) {
+        when (cadastroState) {
+            is CadastroState.Sucesso -> {
+                cadastroViewModel.resetar()
+                aoCadastroSucesso()
             }
-            is LoginState.Erro -> {
-                mostrarErro = true
-                erroMsg = (loginState as LoginState.Erro).mensagem
+            is CadastroState.Erro -> {
+                mostrarErro = (cadastroState as CadastroState.Erro).mensagem
             }
             else -> Unit
         }
@@ -49,7 +48,6 @@ fun TelaLogin(
             .background(Color.White)
             .padding(top = 32.dp, bottom = 24.dp)
     ) {
-        // Cabeçalho igual ao padrão
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -63,7 +61,7 @@ fun TelaLogin(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "RKTEC LOGIN",
+                "Cadastro de Usuário",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -79,8 +77,14 @@ fun TelaLogin(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("Acesse seu perfil", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color(0xFF174D86))
-            Spacer(Modifier.height(20.dp))
+            OutlinedTextField(
+                value = nome,
+                onValueChange = { nome = it },
+                label = { Text("Nome de usuário") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(14.dp))
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -88,7 +92,7 @@ fun TelaLogin(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
             OutlinedTextField(
                 value = senha,
                 onValueChange = { senha = it },
@@ -97,38 +101,45 @@ fun TelaLogin(
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation()
             )
-            Spacer(Modifier.height(10.dp))
-            TextButton(
-                onClick = { onEsqueciSenha(email) },
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text("Esqueci minha senha")
-            }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
+            OutlinedTextField(
+                value = confirmacao,
+                onValueChange = { confirmacao = it },
+                label = { Text("Confirme a senha") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(Modifier.height(22.dp))
             Button(
-                onClick = { viewModel.autenticar(email.trim(), senha) },
-                enabled = email.isNotBlank() && senha.isNotBlank(),
+                onClick = {
+                    mostrarErro = null
+                    if (nome.isBlank() || email.isBlank() || senha.isBlank() || confirmacao.isBlank()) {
+                        mostrarErro = "Preencha todos os campos!"
+                    } else if (senha != confirmacao) {
+                        mostrarErro = "As senhas não conferem!"
+                    } else {
+                        cadastroViewModel.cadastrar(nome.trim(), email.trim(), senha)
+                    }
+                },
+                enabled = cadastroState !is CadastroState.Loading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
             ) {
-                Text("Entrar", fontSize = 20.sp, color = Color.White)
+                Text("Cadastrar", fontSize = 20.sp, color = Color.White)
             }
-            if (mostrarErro) {
-                Text(erroMsg, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
+            mostrarErro?.let {
+                Text(it, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
             }
+            Spacer(Modifier.height(14.dp))
             TextButton(
-                onClick = onIrParaCadastro,
-                modifier = Modifier.fillMaxWidth()
+                onClick = aoVoltarLogin
             ) {
-                Text("Criar nova conta", color = Color(0xFF174D86))
+                Text("Já tenho uma conta", color = Color(0xFF174D86))
             }
         }
     }
 }
-
-
-
-

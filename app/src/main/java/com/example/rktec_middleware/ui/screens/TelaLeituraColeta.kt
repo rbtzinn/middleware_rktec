@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
@@ -8,7 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,13 +18,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import com.example.rktec_middleware.viewmodel.RfidViewModel
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.graphics.Brush
 
 @Composable
 fun TelaLeituraColeta(
@@ -37,7 +41,6 @@ fun TelaLeituraColeta(
     val tagList by viewModel.tagList.collectAsState()
     var lendo by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-
     var isDialogVoltarAberto by remember { mutableStateOf(false) }
     var isDialogLimparAberto by remember { mutableStateOf(false) }
     var naoMostrarLimpar by rememberSaveable { mutableStateOf(false) }
@@ -45,38 +48,35 @@ fun TelaLeituraColeta(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(top = 32.dp, bottom = 24.dp)
+            .background(Color(0xFFF5F7FA))
     ) {
-        // CABEÇALHO
+        // CABEÇALHO padrão
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
-                .offset(y = -32.dp)
+                .height(110.dp)
                 .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF4A90E2), Color(0xFF174D86))
+                    Brush.verticalGradient(
+                        0f to Color(0xFF174D86),
+                        1f to Color(0xFF4A90E2)
                     )
                 )
+                .shadow(3.dp)
         ) {
-            // Ícone Voltar/
             IconButton(
                 onClick = { isDialogVoltarAberto = true },
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 8.dp)
                     .size(48.dp)
-                    .padding(top = 32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack,
                     contentDescription = "Voltar",
                     tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
-            // TÍTULO CENTRALIZADO
             Text(
                 "COLETA",
                 color = Color.White,
@@ -84,9 +84,7 @@ fun TelaLeituraColeta(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(top = 32.dp)
             )
-            // Ícone Limpar à direita
             IconButton(
                 onClick = {
                     if (naoMostrarLimpar) {
@@ -99,38 +97,39 @@ fun TelaLeituraColeta(
                     .align(Alignment.CenterEnd)
                     .padding(end = 8.dp)
                     .size(48.dp)
-                    .padding(top = 32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
                     contentDescription = "Limpar tags",
                     tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        // Mensagem de leitura
         Text(
-            if (lendo) "Leitura sendo efetuada..." else "Pressione o gatilho para ler",
-            fontWeight = FontWeight.Bold,
+            if (lendo) "Lendo etiquetas RFID..." else "Pressione o gatilho do PDA para ler",
+            fontWeight = FontWeight.SemiBold,
             color = Color(0xFF4A90E2),
-            fontSize = 18.sp,
+            fontSize = 17.sp,
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         Text(
             "Total de tags lidas: ${tagList.size}",
-            fontSize = 16.sp,
-            color = Color.DarkGray,
+            fontSize = 15.sp,
+            color = Color(0xFF666666),
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
+        // LISTA DE TAGS
         SwipeRefresh(
             state = rememberSwipeRefreshState(isRefreshing),
             onRefresh = {
@@ -142,69 +141,100 @@ fun TelaLeituraColeta(
                 .weight(1f)
         ) {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                shape = RoundedCornerShape(18.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp)
+                    .padding(horizontal = 14.dp, vertical = 2.dp)
             ) {
                 if (tagList.isEmpty()) {
                     Box(
                         Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Nenhuma etiqueta lida ainda", color = Color.Gray)
+                        Text(
+                            "Nenhuma etiqueta lida ainda",
+                            color = Color(0xFFB0BEC5),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 } else {
                     LazyColumn(
                         Modifier
                             .fillMaxSize()
-                            .padding(8.dp)
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(tagList) { tag ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FC)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .shadow(1.dp, RoundedCornerShape(12.dp))
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Person,
-                                    contentDescription = "Tag",
-                                    tint = Color(0xFF4A90E2),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(tag.epc, fontSize = 16.sp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp, horizontal = 10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(Color(0xFF4A90E2), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Nfc,
+                                            contentDescription = "Tag",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        tag.epc,
+                                        fontSize = 15.sp,
+                                        color = Color(0xFF174D86),
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                }
                             }
-                            Divider()
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Botão Finalizar Coleta (apenas volta pra home/menu)
+        // Botão Finalizar Coleta
         Button(
-            onClick = { onVoltar() },
+            onClick = { viewModel.limparTags() },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 8.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                .height(54.dp)
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF4A90E2)
+            ),
+            elevation = ButtonDefaults.buttonElevation(8.dp)
         ) {
-            Text("Finalizar Coleta", fontSize = 20.sp, color = Color.White)
+            Text("Finalizar Coleta", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(12.dp))
     }
 
     // Dialog de confirmação ao voltar
     if (isDialogVoltarAberto) {
         AlertDialog(
             onDismissRequest = { isDialogVoltarAberto = false },
-            title = { Text("Confirmar saída") },
+            title = { Text("Confirmar saída", fontWeight = FontWeight.Bold) },
             text = { Text("Deseja realmente voltar? As tags lidas serão apagadas.") },
             confirmButton = {
                 TextButton(onClick = {
@@ -213,12 +243,12 @@ fun TelaLeituraColeta(
                     naoMostrarLimpar = false
                     onVoltar()
                 }) {
-                    Text("Sim")
+                    Text("Sim", color = Color(0xFF4A90E2), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isDialogVoltarAberto = false }) {
-                    Text("Não")
+                    Text("Não", color = Color.Gray)
                 }
             }
         )
@@ -228,7 +258,7 @@ fun TelaLeituraColeta(
     if (isDialogLimparAberto) {
         AlertDialog(
             onDismissRequest = { isDialogLimparAberto = false },
-            title = { Text("Confirmar limpeza") },
+            title = { Text("Confirmar limpeza", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     Text("Deseja realmente limpar as tags lidas?")
@@ -248,12 +278,12 @@ fun TelaLeituraColeta(
                     viewModel.limparTags()
                     isDialogLimparAberto = false
                 }) {
-                    Text("Sim")
+                    Text("Sim", color = Color(0xFF4A90E2), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { isDialogLimparAberto = false }) {
-                    Text("Não")
+                    Text("Não", color = Color.Gray)
                 }
             }
         )
