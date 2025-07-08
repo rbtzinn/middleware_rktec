@@ -1,30 +1,28 @@
 package com.example.rktec_middleware.util
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.first
-
-private val Context.dataStore by preferencesDataStore("usuario_logado")
+import android.util.Log
 
 object UsuarioLogadoManager {
-    private val USUARIO_KEY = stringPreferencesKey("usuario_logado")
+    private const val PREFS_NAME = "usuario_logado"
+    private const val CHAVE_USUARIO = "email"
 
-    suspend fun salvarUsuario(context: Context, nomeUsuario: String) {
-        context.dataStore.edit { prefs ->
-            prefs[USUARIO_KEY] = nomeUsuario
-        }
+    fun salvarUsuario(context: Context, email: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(CHAVE_USUARIO, email).apply()
+        Log.d("RKTEC", "SALVOU EMAIL NAS PREFS: $email")
     }
 
-    suspend fun obterUsuario(context: Context): String? {
-        val prefs = context.dataStore.data.first()
-        return prefs[USUARIO_KEY]
+    fun obterUsuario(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val email = prefs.getString(CHAVE_USUARIO, null)
+        Log.d("RKTEC", "PEGOU EMAIL DAS PREFS: $email")
+        return email
     }
 
-    suspend fun limparUsuario(context: Context) {
-        context.dataStore.edit { prefs ->
-            prefs.remove(USUARIO_KEY)
-        }
+    fun limparUsuario(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(CHAVE_USUARIO).apply()
+        Log.d("RKTEC", "LIMPOU EMAIL DAS PREFS")
     }
 }

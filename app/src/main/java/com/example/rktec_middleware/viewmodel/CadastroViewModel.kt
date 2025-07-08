@@ -1,14 +1,12 @@
 package com.example.rktec_middleware.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.rktec_middleware.data.model.TipoUsuario
-import com.example.rktec_middleware.data.model.Usuario
-import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.util.SenhaUtils
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+
+
 
 sealed class CadastroState {
     object Idle : CadastroState()
@@ -17,34 +15,28 @@ sealed class CadastroState {
     data class Erro(val mensagem: String) : CadastroState()
 }
 
-class CadastroViewModel(
-    private val usuarioRepo: UsuarioRepository
-) : ViewModel() {
+class CadastroViewModel : ViewModel() {
     private val _cadastroState = MutableStateFlow<CadastroState>(CadastroState.Idle)
     val cadastroState: StateFlow<CadastroState> = _cadastroState
 
-    fun cadastrar(nome: String, email: String, senha: String, tipo: TipoUsuario = TipoUsuario.MEMBRO) {
-        viewModelScope.launch {
-            _cadastroState.value = CadastroState.Loading
-
-            val jaExiste = usuarioRepo.buscarPorEmail(email)
-            if (jaExiste != null) {
-                _cadastroState.value = CadastroState.Erro("Já existe um usuário com esse e-mail.")
-                return@launch
+    fun cadastrar(nome: String, email: String, senha: String) {
+        _cadastroState.value = CadastroState.Loading
+        FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, senha)
+            .addOnSuccessListener { result ->
+                val user = result.user
+                user?.updateProfile(
+                    UserProfileChangeRequest.Builder().setDisplayName(nome).build()
+                )?.addOnCompleteListener {
+                    _cadastroState.value = CadastroState.Sucesso
+                }
             }
-
-            val usuario = Usuario(
-                nome = nome,
-                email = email,
-                senhaHash = SenhaUtils.hashSenha(senha),
-                tipo = tipo
-            )
-            usuarioRepo.inserir(usuario)
-            _cadastroState.value = CadastroState.Sucesso
-        }
+            .addOnFailureListener { e ->
+                _cadastroState.value = CadastroState.Erro(e.message ?: "Erro ao cadastrar!")
+            }
     }
 
     fun resetar() {
         _cadastroState.value = CadastroState.Idle
     }
 }
+

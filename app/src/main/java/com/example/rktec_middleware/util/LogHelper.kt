@@ -3,6 +3,7 @@ package com.example.rktec_middleware.util
 import android.content.Context
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.LogMapeamento
+import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.File
 import java.io.FileOutputStream
@@ -10,6 +11,31 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 object LogHelper {
+
+
+    suspend fun registrarGerenciamentoUsuario(
+        context: Context,
+        usuarioResponsavel: String,
+        acao: String, // "EDIÇÃO" ou "EXCLUSÃO"
+        usuarioAlvo: String,
+        motivo: String?,
+        detalhes: String
+    ) {
+        val dataHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+        val db = AppDatabase.getInstance(context)
+        db.logGerenciamentoUsuarioDao().inserir(
+            LogGerenciamentoUsuario(
+                usuarioResponsavel = usuarioResponsavel,
+                dataHora = dataHora,
+                acao = acao,
+                usuarioAlvo = usuarioAlvo,
+                motivo = motivo,
+                detalhes = detalhes
+            )
+        )
+    }
+
+
     suspend fun registrarMapeamento(context: Context, usuario: String, arquivo: String) {
         val dataHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
         val db = AppDatabase.getInstance(context)

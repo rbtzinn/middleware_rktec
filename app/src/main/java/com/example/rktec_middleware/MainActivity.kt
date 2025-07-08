@@ -3,6 +3,7 @@ package com.example.rktec_middleware
 import TelaImportacao
 import android.os.Bundle
 import android.view.KeyEvent
+import android.util.Log
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ import com.example.rktec_middleware.ui.screens.FluxoAutenticacao
 import com.example.rktec_middleware.ui.screens.TelaPrincipal
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
+import com.example.rktec_middleware.ui.screens.TelaGerenciamentoUsuarios
 import com.example.rktec_middleware.util.UsuarioLogadoManager
 import com.example.rktec_middleware.viewmodel.LoginViewModel
 import com.example.rktec_middleware.viewmodel.RecuperarSenhaViewModel
@@ -41,9 +43,9 @@ class MainActivity : ComponentActivity() {
 
         val appDatabase = AppDatabase.getInstance(applicationContext)
         val usuarioRepository = UsuarioRepository(appDatabase.usuarioDao())
-        val loginViewModel = LoginViewModel(usuarioRepository)
-        val recuperarSenhaViewModel = RecuperarSenhaViewModel(usuarioRepository)
-        val cadastroViewModel = CadastroViewModel(usuarioRepository)
+        val loginViewModel = LoginViewModel()
+        val recuperarSenhaViewModel = RecuperarSenhaViewModel()
+        val cadastroViewModel = CadastroViewModel()
         setContent {
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
@@ -56,20 +58,20 @@ class MainActivity : ComponentActivity() {
             var filtroSetor by remember { mutableStateOf<String?>(null) }
             var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
             var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-            var inicializado by remember { mutableStateOf(false) } // <----- ESTADO NOVO
+            var inicializado by remember { mutableStateOf(false) }
 
             // ------- AUTO LOGIN AO ABRIR O APP (SÓ UMA VEZ) -------
             LaunchedEffect(Unit) {
-                if (!inicializado) {
-                    inicializado = true
-                    val nomeSalvo = UsuarioLogadoManager.obterUsuario(context)
-                    if (!nomeSalvo.isNullOrBlank()) {
-                        val usuario = usuarioRepository.buscarPorNome(nomeSalvo)
-                        if (usuario != null) {
-                            usuarioAutenticado = usuario
-                            val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
-                            mapeamentoConcluido = mapeamento != null
-                        }
+                Log.d("RKTEC", "INICIANDO AUTOLOGIN")
+                val emailSalvo = UsuarioLogadoManager.obterUsuario(context)
+                Log.d("RKTEC", "Email salvo nas prefs: $emailSalvo")
+                if (!emailSalvo.isNullOrBlank()) {
+                    val usuario = usuarioRepository.buscarPorEmail(emailSalvo)
+                    Log.d("RKTEC", "Usuário retornado do Room: $usuario")
+                    if (usuario != null) {
+                        usuarioAutenticado = usuario
+                        val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
+                        mapeamentoConcluido = mapeamento != null
                     }
                 }
             }
@@ -83,7 +85,8 @@ class MainActivity : ComponentActivity() {
                     aoLoginSucesso = { usuario ->
                         usuarioAutenticado = usuario
                         scope.launch {
-                            UsuarioLogadoManager.salvarUsuario(context, usuario.nome)
+                            Log.d("RKTEC", "Salvando login: ${usuario.email}")
+                            UsuarioLogadoManager.salvarUsuario(context, usuario.email)
                             val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
                             mapeamentoConcluido = mapeamento != null
                         }
@@ -91,7 +94,6 @@ class MainActivity : ComponentActivity() {
                 )
                 return@setContent
             }
-
             // ----------- FLUXO DE MAPA/IMPORTAÇÃO -------------
             if (!mapeamentoConcluido) {
                 TelaImportacao(
@@ -118,13 +120,16 @@ class MainActivity : ComponentActivity() {
                     nomeUsuario = usuarioAutenticado?.nome ?: "",
                     onSairClick = {
                         scope.launch {
+                            Log.d("RKTEC", "Logout: limpando email salvo")
                             UsuarioLogadoManager.limparUsuario(context)
                             usuarioAutenticado = null
                             mapeamentoConcluido = false
                             telaAtual = "menu"
                         }
-                    }
+                    },
+                    onGerenciarUsuariosClick = { telaAtual = "usuarios" }
                 )
+
                 "leitura" -> TelaLeituraColeta(
                     viewModel = viewModel,
                     onVoltar = { telaAtual = "menu" }
@@ -161,6 +166,28 @@ class MainActivity : ComponentActivity() {
                 "sobre" -> TelaSobre(
                     onVoltar = { telaAtual = "menu" }
                 )
+                // ----------- GERENCIAMENTO DE USUÁRIOS -----------
+                "usuarios" -> {
+                    var usuarios by remember { mutableStateOf<List<Usuario>>(emptyList()) }
+                    val refreshUsuarios: () -> Unit = {
+                        scope.launch {
+                            usuarios = usuarioRepository.listarTodos()
+                        }
+                    }
+                    LaunchedEffect(telaAtual) {
+                        if (telaAtual == "usuarios") {
+                            usuarios = usuarioRepository.listarTodos()
+                        }
+                    }
+                    TelaGerenciamentoUsuarios(
+                        usuarios = usuarios,
+                        usuarioRepository = usuarioRepository,
+                        usuarioLogado = usuarioAutenticado?.nome ?: "",
+                        context = context,
+                        onAtualizarLista = refreshUsuarios,
+                        onVoltar = { telaAtual = "menu" }
+                    )
+                }
             }
         }
     }

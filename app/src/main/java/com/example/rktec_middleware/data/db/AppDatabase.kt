@@ -8,12 +8,14 @@ import com.example.rktec_middleware.data.dao.LogMapeamentoDao
 import com.example.rktec_middleware.data.model.LogMapeamento
 import com.example.rktec_middleware.data.dao.ColetaDao
 import com.example.rktec_middleware.data.dao.InventarioDao
+import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
+import com.example.rktec_middleware.data.dao.LogGerenciamentoUsuarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.data.dao.MapeamentoDao
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
-import com.example.rktec_middleware.data.model.Usuario    // <-- importa o Usuario
-import com.example.rktec_middleware.data.dao.UsuarioDao  // <-- importa o UsuarioDao
+import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.data.dao.UsuarioDao
 
 @Database(
     entities = [
@@ -21,9 +23,10 @@ import com.example.rktec_middleware.data.dao.UsuarioDao  // <-- importa o Usuari
         EpcTag::class,
         MapeamentoPlanilha::class,
         LogMapeamento::class,
-        Usuario::class
+        Usuario::class,
+        LogGerenciamentoUsuario::class
     ],
-    version = 9
+    version = 11
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
@@ -31,6 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mapeamentoDao(): MapeamentoDao
     abstract fun logMapeamentoDao(): LogMapeamentoDao
     abstract fun usuarioDao(): UsuarioDao
+    abstract fun logGerenciamentoUsuarioDao(): LogGerenciamentoUsuarioDao
+
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -42,7 +47,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "rktec.db"
                 )
-                    .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
             }

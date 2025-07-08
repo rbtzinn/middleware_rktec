@@ -2,6 +2,7 @@ package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ManageAccounts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,9 +19,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun TelaPrincipal(
@@ -29,169 +30,188 @@ fun TelaPrincipal(
     onDebugClick: () -> Unit,
     onSobreClick: () -> Unit,
     nomeUsuario: String,
-    onSairClick: () -> Unit
+    onSairClick: () -> Unit,
+    onGerenciarUsuariosClick: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F7FA))
     ) {
-        // Header estilizado
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(130.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color(0xFF174D86),
-                        1f to Color(0xFF4A90E2)
-                    )
-                )
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Header estilizado
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color(0xFF174D86),
+                            1f to Color(0xFF4A90E2)
+                        )
+                    )
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.17f)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Avatar Placeholder (futuro: imagem do usuário)
-                    Text(
-                        text = nomeUsuario.take(2).uppercase(),
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Black,
+                    Box(
                         modifier = Modifier
+                            .size(54.dp)
                             .clip(CircleShape)
-                    )
+                            .background(Color.White.copy(alpha = 0.17f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Avatar Placeholder (futuro: imagem do usuário)
+                        Text(
+                            text = nomeUsuario.take(2).uppercase(),
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.clip(CircleShape)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            "Bem-vindo!",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            nomeUsuario,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = onSairClick,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color.White.copy(alpha = 0.20f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Filled.ExitToApp,
+                            contentDescription = "Sair",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(
-                        "Bem-vindo!",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        nomeUsuario,
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = onSairClick,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.White.copy(alpha = 0.20f), CircleShape)
+            }
+
+            // Cards das ações principais
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .offset(y = (-30).dp)
+                    .padding(horizontal = 20.dp)
+            ) {
+                FeatureCard(
+                    title = "Coleta",
+                    subtitle = "Ler etiquetas RFID em tempo real",
+                    icon = Icons.Filled.PlayCircle,
+                    color = Color(0xFF4A90E2),
+                    onClick = onColetaClick
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                FeatureCard(
+                    title = "Inventário",
+                    subtitle = "Controle e acompanhe o estoque",
+                    icon = Icons.Filled.ListAlt,
+                    color = Color(0xFF45B37B),
+                    onClick = onInventarioClick
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Opções avançadas
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 0.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TextButton(
+                    onClick = onDebugClick,
+                    modifier = Modifier.padding(vertical = 8.dp)
                 ) {
-                    Icon(
-                        Icons.Filled.ExitToApp,
-                        contentDescription = "Sair",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                    Text(
+                        "Debug - banco de dados",
+                        fontSize = 14.sp,
+                        color = Color.Gray
                     )
                 }
             }
-        }
 
-        // Cards das ações principais
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .offset(y = (-30).dp)
-                .padding(horizontal = 20.dp)
-        ) {
-            FeatureCard(
-                title = "Coleta",
-                subtitle = "Ler etiquetas RFID em tempo real",
-                icon = Icons.Filled.PlayCircle,
-                color = Color(0xFF4A90E2),
-                onClick = onColetaClick
-            )
-            Spacer(modifier = Modifier.height(18.dp))
-            FeatureCard(
-                title = "Inventário",
-                subtitle = "Controle e acompanhe o estoque",
-                icon = Icons.Filled.ListAlt,
-                color = Color(0xFF45B37B),
-                onClick = onInventarioClick
-            )
-        }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Opções avançadas
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 0.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            TextButton(
-                onClick = onDebugClick,
-                modifier = Modifier.padding(vertical = 8.dp)
+            // Footer minimalista
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Divider(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFFEEEEEE),
+                    thickness = 1.dp
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TextButton(onClick = onSobreClick) {
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = "Sobre o Sistema",
+                            tint = Color(0xFF009688),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "Sobre o Sistema",
+                            fontSize = 14.sp,
+                            color = Color(0xFF009688),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    "Debug - banco de dados",
-                    fontSize = 14.sp,
+                    "RKTECNOLOGIAS",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF009688),
+                    fontSize = 16.sp
+                )
+                Text(
+                    "Todos os direitos reservados",
+                    fontSize = 12.sp,
                     color = Color.Gray
                 )
             }
         }
 
-        // Footer minimalista
-        Column(
+        // --- Floating Action Button para Gerenciar Usuários ---
+        FloatingActionButton(
+            onClick = onGerenciarUsuariosClick,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 36.dp),
+            containerColor = Color(0xFF174D86)
         ) {
-            Divider(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFFEEEEEE),
-                thickness = 1.dp
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                TextButton(onClick = onSobreClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = "Sobre o Sistema",
-                        tint = Color(0xFF009688),
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "Sobre o Sistema",
-                        fontSize = 14.sp,
-                        color = Color(0xFF009688),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                "RKTECNOLOGIAS",
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF009688),
-                fontSize = 16.sp
-            )
-            Text(
-                "Todos os direitos reservados",
-                fontSize = 12.sp,
-                color = Color.Gray
+            Icon(
+                imageVector = Icons.Filled.ManageAccounts,
+                contentDescription = "Gerenciar Usuários",
+                tint = Color.White
             )
         }
     }

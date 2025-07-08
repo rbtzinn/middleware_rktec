@@ -22,4 +22,9 @@ interface UsuarioDao {
 
     @Query("SELECT * FROM Usuario WHERE nome = :nome LIMIT 1")
     suspend fun buscarPorNome(nome: String): Usuario?
+
+    @Query("SELECT email FROM Usuario")
+    suspend fun listarEmails(): List<String>
+
+
 }

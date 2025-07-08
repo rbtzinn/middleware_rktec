@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+    id("com.google.gms.google-services")
 }
 
 
@@ -72,6 +73,12 @@ dependencies {
     implementation("io.github.vanpra.compose-material-dialogs:core:0.9.0")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation ("androidx.compose.material3:material3:1.2.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth-ktx:23.2.1")
+    implementation ("com.google.firebase:firebase-firestore-ktx:25.1.4")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
 
     // ROOM (AQUI ESTÁ CERTO!)
     implementation("androidx.room:room-runtime:2.6.1")

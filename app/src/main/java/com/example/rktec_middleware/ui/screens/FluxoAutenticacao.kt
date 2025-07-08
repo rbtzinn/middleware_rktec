@@ -7,7 +7,7 @@ import com.example.rktec_middleware.viewmodel.LoginViewModel
 import com.example.rktec_middleware.viewmodel.RecuperarSenhaViewModel
 
 enum class TelaAutenticacao {
-    LOGIN, ESQUECI_SENHA, CODIGO, REDEFINIR, CADASTRO
+    LOGIN, ESQUECI_SENHA, CADASTRO
 }
 
 
@@ -42,24 +42,11 @@ fun FluxoAutenticacao(
         TelaAutenticacao.ESQUECI_SENHA -> TelaEsqueciSenha(
             aoEnviarCodigo = { email ->
                 emailSalvo = email
-                recuperarSenhaViewModel.enviarCodigo(email)
-                telaAtual = TelaAutenticacao.CODIGO
-            }
-        )
-
-        TelaAutenticacao.CODIGO -> TelaCodigoVerificacao(
-            aoValidarCodigo = { codigo ->
-                if (recuperarSenhaViewModel.validarCodigo(codigo)) {
-                    telaAtual = TelaAutenticacao.REDEFINIR
-                }
-            }
-        )
-
-        TelaAutenticacao.REDEFINIR -> TelaRedefinirSenha(
-            aoSalvar = { novaSenha ->
-                recuperarSenhaViewModel.redefinirSenha(novaSenha)
-                telaAtual = TelaAutenticacao.LOGIN
-            }
+                recuperarSenhaViewModel.enviarResetEmail(email)
+                // Mostre mensagem na tela: "Verifique seu e-mail para redefinir sua senha."
+                telaAtual = TelaAutenticacao.LOGIN // ou permaneça na mesma tela mostrando feedback
+            },
+            aoVoltarLogin = { telaAtual = TelaAutenticacao.LOGIN }
         )
     }
 }
