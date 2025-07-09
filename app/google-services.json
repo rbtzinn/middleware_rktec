@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "120611359461",
-    "project_id": "rktecmidd",
-    "storage_bucket": "rktecmidd.firebasestorage.app"
+    "project_number": "889612337320",
+    "project_id": "rktec-3b6ba",
+    "storage_bucket": "rktec-3b6ba.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:120611359461:android:b6c11b27ae19504937a20c",
+        "mobilesdk_app_id": "1:889612337320:android:4a5fcaf0a05c166b2e029d",
         "android_client_info": {
           "package_name": "com.example.rktec_middleware"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDcgW_VCtpNna23nh-HkU-avB-S-s7YDLM"
+          "current_key": "AIzaSyCNSsIoEcG8b7Dt4UkUlAONJb2e2aEn5Ec"
         }
       ],
       "services": {

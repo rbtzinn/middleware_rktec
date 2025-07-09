@@ -26,7 +26,7 @@ import com.example.rktec_middleware.data.dao.UsuarioDao
         Usuario::class,
         LogGerenciamentoUsuario::class
     ],
-    version = 11
+    version = 12
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
@@ -47,6 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "rktec.db"
                 )
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
             }

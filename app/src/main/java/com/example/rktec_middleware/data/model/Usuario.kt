@@ -11,5 +11,6 @@ data class Usuario(
     val nome: String,
     val email: String,
     val senhaHash: String,
-    val tipo: TipoUsuario
+    val tipo: TipoUsuario,
+    val ativo: Boolean = true
 )

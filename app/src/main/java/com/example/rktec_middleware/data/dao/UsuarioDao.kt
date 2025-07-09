@@ -26,5 +26,6 @@ interface UsuarioDao {
     @Query("SELECT email FROM Usuario")
     suspend fun listarEmails(): List<String>
 
-
+    @Query("UPDATE Usuario SET ativo = :ativo WHERE email = :email")
+    suspend fun setAtivo(email: String, ativo: Boolean)
 }

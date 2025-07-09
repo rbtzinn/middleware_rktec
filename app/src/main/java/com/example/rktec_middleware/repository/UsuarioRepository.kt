@@ -20,6 +20,14 @@ class UsuarioRepository(private val usuarioDao: UsuarioDao) {
         usuarioDao.deletar(usuario)
         usuariosCollection.document(usuario.email).delete().await()
     }
+    suspend fun setUsuarioAtivo(email: String, ativo: Boolean) {
+        usuarioDao.setAtivo(email, ativo)
+    }
+
+    suspend fun cadastrarUsuario(usuario: Usuario) {
+        usuarioDao.inserir(usuario)
+    }
+
 
     suspend fun atualizarUsuario(usuario: Usuario) {
         usuarioDao.atualizar(usuario)

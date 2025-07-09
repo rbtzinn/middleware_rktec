@@ -1,23 +1,29 @@
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.viewmodel.CadastroViewModel
+import com.example.rktec_middleware.viewmodel.CadastroViewModelFactory
 import com.example.rktec_middleware.viewmodel.LoginViewModel
+import com.example.rktec_middleware.viewmodel.LoginViewModelFactory
 import com.example.rktec_middleware.viewmodel.RecuperarSenhaViewModel
 
 enum class TelaAutenticacao {
     LOGIN, ESQUECI_SENHA, CADASTRO
 }
 
-
 @Composable
 fun FluxoAutenticacao(
-    loginViewModel: LoginViewModel,
-    recuperarSenhaViewModel: RecuperarSenhaViewModel,
-    aoLoginSucesso: (Usuario) -> Unit,
-    cadastroViewModel: CadastroViewModel
+    usuarioRepository: UsuarioRepository,
+    aoLoginSucesso: (Usuario) -> Unit
 ) {
+    // Os ViewModels agora recebem o repository corretamente!
+    val loginViewModel: LoginViewModel = viewModel(factory = LoginViewModelFactory(usuarioRepository))
+    val cadastroViewModel: CadastroViewModel = viewModel(factory = CadastroViewModelFactory(usuarioRepository))
+    val recuperarSenhaViewModel: RecuperarSenhaViewModel = viewModel() // se não usa repo, pode manter assim
+
     var telaAtual by remember { mutableStateOf(TelaAutenticacao.LOGIN) }
     var emailSalvo by remember { mutableStateOf("") }
 
@@ -43,8 +49,7 @@ fun FluxoAutenticacao(
             aoEnviarCodigo = { email ->
                 emailSalvo = email
                 recuperarSenhaViewModel.enviarResetEmail(email)
-                // Mostre mensagem na tela: "Verifique seu e-mail para redefinir sua senha."
-                telaAtual = TelaAutenticacao.LOGIN // ou permaneça na mesma tela mostrando feedback
+                telaAtual = TelaAutenticacao.LOGIN
             },
             aoVoltarLogin = { telaAtual = TelaAutenticacao.LOGIN }
         )

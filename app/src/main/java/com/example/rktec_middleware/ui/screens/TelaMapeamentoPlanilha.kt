@@ -1,7 +1,12 @@
 package com.example.rktec_middleware.ui.screens
 
+import android.Manifest
+import android.app.Activity
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
+import com.example.rktec_middleware.util.LogHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.apache.poi.ss.usermodel.WorkbookFactory
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -25,16 +33,35 @@ import java.io.InputStreamReader
 @Composable
 fun TelaMapeamentoPlanilha(
     uri: Uri,
+    usuarioLogado: String,
     onSalvar: (MapeamentoPlanilha, List<String>) -> Unit,
     onCancelar: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
+    val scope = rememberCoroutineScope()
     var colunas by remember { mutableStateOf<List<String>>(emptyList()) }
     var indexEpc by remember { mutableStateOf<Int?>(null) }
     var indexNome by remember { mutableStateOf<Int?>(null) }
     var indexSetor by remember { mutableStateOf<Int?>(null) }
     var indexLoja by remember { mutableStateOf<Int?>(null) }
+    var erroPermissao by remember { mutableStateOf<String?>(null) }
 
+    // Permissão para Android 9
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            if (granted) {
+                salvarMapeamento(
+                    context, scope, usuarioLogado, uri, colunas, indexEpc, indexNome, indexSetor, indexLoja, onSalvar
+                )
+            } else {
+                erroPermissao = "Permissão de armazenamento negada. Não foi possível salvar o relatório."
+            }
+        }
+    )
+
+    // Detecta colunas
     LaunchedEffect(uri) {
         val fileName = uri.lastPathSegment ?: ""
         val contentResolver = context.contentResolver
@@ -108,19 +135,14 @@ fun TelaMapeamentoPlanilha(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Selecione qual coluna representa cada campo:", fontWeight = FontWeight.Bold)
-
             Text("Coluna do EPC *", fontWeight = FontWeight.Medium)
             DropdownMenuCampo(colunas, indexEpc) { indexEpc = it }
-
             Text("Coluna do Nome (opcional)", fontWeight = FontWeight.Medium)
             DropdownMenuCampo(colunas, indexNome) { indexNome = it }
-
             Text("Coluna do Setor (opcional)", fontWeight = FontWeight.Medium)
             DropdownMenuCampo(colunas, indexSetor) { indexSetor = it }
-
             Text("Coluna da Loja (opcional)", fontWeight = FontWeight.Medium)
             DropdownMenuCampo(colunas, indexLoja) { indexLoja = it }
-
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(
@@ -128,17 +150,23 @@ fun TelaMapeamentoPlanilha(
                     shape = RoundedCornerShape(28.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2)),
                     onClick = {
-                        onSalvar(
-                            MapeamentoPlanilha(
-                                usuario = "",
-                                nomeArquivo = uri.lastPathSegment ?: "",
-                                colunaEpc = indexEpc!!,
-                                colunaNome = indexNome,
-                                colunaSetor = indexSetor,
-                                colunaLoja = indexLoja
-                            ),
-                            colunas
-                        )
+                        erroPermissao = null
+                        // Checar/solicitar permissão antes de salvar
+                        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+                            val granted = context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                            if (!granted) {
+                                // Pedir permissão
+                                requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            } else {
+                                salvarMapeamento(
+                                    context, scope, usuarioLogado, uri, colunas, indexEpc, indexNome, indexSetor, indexLoja, onSalvar
+                                )
+                            }
+                        } else {
+                            salvarMapeamento(
+                                context, scope, usuarioLogado, uri, colunas, indexEpc, indexNome, indexSetor, indexLoja, onSalvar
+                            )
+                        }
                     }
                 ) {
                     Text("Salvar", fontSize = 18.sp, color = Color.White)
@@ -150,10 +178,129 @@ fun TelaMapeamentoPlanilha(
                     Text("Cancelar", fontSize = 18.sp)
                 }
             }
+            erroPermissao?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, color = Color.Red, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
 
+// Função helper pra evitar repetição no botão
+private fun salvarMapeamento(
+    context: android.content.Context,
+    scope: CoroutineScope,
+    usuario: String,
+    uri: Uri,
+    colunas: List<String>,
+    indexEpc: Int?,
+    indexNome: Int?,
+    indexSetor: Int?,
+    indexLoja: Int?,
+    onSalvar: (MapeamentoPlanilha, List<String>) -> Unit
+) {
+    scope.launch {
+        val nomeArquivo = uri.lastPathSegment ?: ""
+        val mapeamento = MapeamentoPlanilha(
+            usuario = usuario,
+            nomeArquivo = nomeArquivo,
+            colunaEpc = indexEpc!!,
+            colunaNome = indexNome,
+            colunaSetor = indexSetor,
+            colunaLoja = indexLoja
+        )
+        onSalvar(mapeamento, colunas)
+        LogHelper.registrarMapeamento(context, usuario, nomeArquivo)
+        val arquivo = LogHelper.exportarRelatorioMapeamentoXlsx(context, usuario, nomeArquivo, mapeamento, colunas)
+        if (arquivo != null) {
+            Toast.makeText(
+                context,
+                "Relatório salvo em:\n${arquivo.absolutePath}",
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(
+                context,
+                "Erro ao salvar arquivo! Verifique as permissões de armazenamento do app.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+
+
+    @Composable
+fun DropdownMenuCampo(
+    colunas: List<String>,
+    selecionado: Int?,
+    onSelecionado: (Int?) -> Unit
+) {
+        var expanded by remember { mutableStateOf(false) }
+        val displayText =
+            if (selecionado != null && selecionado in colunas.indices) colunas[selecionado] else "Selecione"
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentSize(Alignment.TopStart)
+        ) {
+            OutlinedButton(
+                onClick = { expanded = true },
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF1A6DB0)
+                ),
+                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = displayText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF212529),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.ArrowDropDown,
+                        contentDescription = "Abrir menu",
+                        tint = Color(0xFF6C757D)
+                    )
+                }
+            }
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .background(Color.White)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Nenhum") },
+                    onClick = {
+                        onSelecionado(null)
+                        expanded = false
+                    }
+                )
+                colunas.forEachIndexed { idx, col ->
+                    DropdownMenuItem(
+                        text = { Text(col) },
+                        onClick = {
+                            onSelecionado(idx)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
 @Composable
 fun DropdownMenuCampo(
     colunas: List<String>,
@@ -162,7 +309,6 @@ fun DropdownMenuCampo(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val displayText = if (selecionado != null && selecionado in colunas.indices) colunas[selecionado] else "Selecione"
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -175,9 +321,7 @@ fun DropdownMenuCampo(
                 containerColor = Color.White,
                 contentColor = Color(0xFF1A6DB0)
             ),
-            border = ButtonDefaults.outlinedButtonBorder.copy(
-                width = 1.dp
-            ),
+            border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
@@ -200,13 +344,12 @@ fun DropdownMenuCampo(
                 )
             }
         }
-
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 300.dp) // LIMITA ALTURA!
+                .heightIn(max = 300.dp)
                 .background(Color.White)
         ) {
             DropdownMenuItem(
@@ -228,4 +371,3 @@ fun DropdownMenuCampo(
         }
     }
 }
-

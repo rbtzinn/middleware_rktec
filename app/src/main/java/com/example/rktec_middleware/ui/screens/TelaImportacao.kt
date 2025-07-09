@@ -1,4 +1,8 @@
+package com.example.rktec_middleware.ui.screens
+
+import android.Manifest
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -20,7 +24,7 @@ import com.example.rktec_middleware.ui.screens.TelaMapeamentoPlanilha
 
 @Composable
 fun TelaImportacao(
-    onConcluido: () -> Unit,
+    onConcluido: (String) -> Unit,
     appDatabase: AppDatabase,
     usuario: String,
     onDebugClick: () -> Unit,
@@ -30,6 +34,26 @@ fun TelaImportacao(
     val scope = rememberCoroutineScope()
     var uriParaMapeamento by remember { mutableStateOf<Uri?>(null) }
     var erro by remember { mutableStateOf<String?>(null) }
+    var permissaoConcedida by remember { mutableStateOf(true) }
+
+    // 1. Lançador de permissão para Android < 10
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            permissaoConcedida = granted
+            if (!granted) {
+                erro = "Permissão de armazenamento negada. Não é possível salvar arquivos de relatório."
+            }
+        }
+    )
+
+    // 2. Pede permissão logo que entra na tela (Android < 10)
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            permissaoConcedida = false
+            requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
 
     // Lançador pra escolher arquivo
     val launcher = rememberLauncherForActivityResult(
@@ -46,6 +70,7 @@ fun TelaImportacao(
     if (uriParaMapeamento != null) {
         TelaMapeamentoPlanilha(
             uri = uriParaMapeamento!!,
+            usuarioLogado = usuario,
             onSalvar = { mapeamento, nomesColunas ->
                 scope.launch {
                     val contentResolver = context.contentResolver
@@ -86,7 +111,7 @@ fun TelaImportacao(
                     )
 
                     uriParaMapeamento = null
-                    onConcluido()
+                    onConcluido("relatorio mapeamento.xlsx")
                 }
             },
             onCancelar = { uriParaMapeamento = null }
@@ -144,7 +169,8 @@ fun TelaImportacao(
                     .fillMaxWidth()
                     .height(80.dp),
                 shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2)),
+                enabled = permissaoConcedida // Só habilita se tem permissão
             ) {
                 Text("Selecionar planilha (.csv ou .xls)", fontSize = 20.sp, color = Color.White)
             }

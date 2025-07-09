@@ -1,6 +1,7 @@
 package com.example.rktec_middleware.ui.screens
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.util.LogHelper
+import com.example.rktec_middleware.util.LogUtil
 import kotlinx.coroutines.launch
 
 private val AzulRktec = Color(0xFF174D86)
@@ -174,8 +175,8 @@ fun TelaGerenciamentoUsuarios(
                                 ) {
                                     Icon(
                                         Icons.Filled.Delete,
-                                        contentDescription = "Excluir",
-                                        tint = Color(0xFFD32F2F)
+                                        contentDescription = if (usuario.ativo) "Desativar" else "Ativar",
+                                        tint = if (usuario.ativo) Color(0xFFD32F2F) else Color(0xFF4CAF50)
                                     )
                                 }
                             }
@@ -230,14 +231,26 @@ fun TelaGerenciamentoUsuarios(
                                             tipo = tipoEditado
                                         )
                                         usuarioRepository.atualizarUsuario(usuarioAtualizado)
-                                        LogHelper.registrarGerenciamentoUsuario(
+                                        val arquivo = LogUtil.logAcaoGerenciamentoUsuario(
                                             context = context,
                                             usuarioResponsavel = usuarioLogado,
                                             acao = "EDIÇÃO",
                                             usuarioAlvo = usuarioAtualizado.email,
-                                            motivo = null,
                                             detalhes = "Nome antigo: ${it.nome}, novo: $nomeEditado | Tipo: ${it.tipo.name} → ${tipoEditado.name}"
                                         )
+                                        if (arquivo != null) {
+                                            Toast.makeText(
+                                                context,
+                                                "Relatório salvo em:\n${arquivo.absolutePath}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Erro ao salvar arquivo! Verifique as permissões de armazenamento do app.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
                                         onAtualizarLista()
                                     }
                                 }
@@ -300,27 +313,70 @@ fun TelaGerenciamentoUsuarios(
                             onClick = {
                                 mostrandoDialogoExcluir = false
                                 scope.launch {
-                                    usuarioParaExcluir?.let {
-                                        usuarioRepository.deletarUsuario(it)
-                                        LogHelper.registrarGerenciamentoUsuario(
-                                            context = context,
-                                            usuarioResponsavel = usuarioLogado,
-                                            acao = "EXCLUSÃO",
-                                            usuarioAlvo = it.email,
-                                            motivo = motivoExclusao,
-                                            detalhes = "Usuário excluído: ${it.nome} (${it.email})"
-                                        )
+                                    usuarioParaExcluir?.let { usuario ->
+                                        if (usuario.ativo) {
+                                            usuarioRepository.setUsuarioAtivo(usuario.email, false)
+                                            val arquivo = LogUtil.logAcaoGerenciamentoUsuario(
+                                                context = context,
+                                                usuarioResponsavel = usuarioLogado,
+                                                acao = "DESATIVAÇÃO",
+                                                usuarioAlvo = usuario.email,
+                                                motivo = motivoExclusao,
+                                                detalhes = "Usuário desativado: ${usuario.nome} (${usuario.email})"
+                                            )
+                                            if (arquivo != null) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Relatório salvo em:\n${arquivo.absolutePath}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Erro ao salvar arquivo! Verifique as permissões de armazenamento do app.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        } else {
+                                            usuarioRepository.setUsuarioAtivo(usuario.email, true)
+                                            val arquivo = LogUtil.logAcaoGerenciamentoUsuario(
+                                                context = context,
+                                                usuarioResponsavel = usuarioLogado,
+                                                acao = "REATIVAÇÃO",
+                                                usuarioAlvo = usuario.email,
+                                                detalhes = "Usuário reativado: ${usuario.nome} (${usuario.email})"
+                                            )
+                                            if (arquivo != null) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Relatório salvo em:\n${arquivo.absolutePath}",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Erro ao salvar arquivo! Verifique as permissões de armazenamento do app.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
                                         onAtualizarLista()
                                     }
                                     motivoExclusao = ""
                                 }
                             },
-                            enabled = motivoExclusao.isNotBlank(),
+                            enabled = motivoExclusao.isNotBlank() || (usuarioParaExcluir != null && !usuarioParaExcluir!!.ativo),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFD32F2F)
+                                containerColor = if (usuarioParaExcluir?.ativo == true) Color(0xFFD32F2F) else Color(0xFF4CAF50)
                             )
-                        ) { Text("Excluir", color = Color.White) }
+                        ) {
+                            Text(
+                                if (usuarioParaExcluir?.ativo == true) "Desativar" else "Reativar",
+                                color = Color.White
+                            )
+                        }
+
                     },
                     dismissButton = {
                         TextButton(onClick = { mostrandoDialogoExcluir = false }) {

@@ -47,6 +47,42 @@ object LogHelper {
             )
         )
     }
+
+    suspend fun exportarLogsGerenciamentoUsuarioXlsx(
+        context: Context,
+        nomeArquivo: String = "relatorio_log_usuarios.xlsx"
+    ): File {
+        val db = AppDatabase.getInstance(context)
+        val logs = db.logGerenciamentoUsuarioDao().listarTodos()
+        val workbook = XSSFWorkbook()
+        val sheet = workbook.createSheet("Log Usuários")
+
+        val header = sheet.createRow(0)
+        header.createCell(0).setCellValue("Responsável")
+        header.createCell(1).setCellValue("DataHora")
+        header.createCell(2).setCellValue("Ação")
+        header.createCell(3).setCellValue("Usuário Alvo")
+        header.createCell(4).setCellValue("Motivo")
+        header.createCell(5).setCellValue("Detalhes")
+
+        logs.forEachIndexed { index, log ->
+            val row = sheet.createRow(index + 1)
+            row.createCell(0).setCellValue(log.usuarioResponsavel)
+            row.createCell(1).setCellValue(log.dataHora)
+            row.createCell(2).setCellValue(log.acao)
+            row.createCell(3).setCellValue(log.usuarioAlvo)
+            row.createCell(4).setCellValue(log.motivo ?: "")
+            row.createCell(5).setCellValue(log.detalhes)
+        }
+
+        val pasta = criarPastaRelatorios(context)
+        val file = File(pasta, nomeArquivo)
+        FileOutputStream(file).use { workbook.write(it) }
+        workbook.close()
+        return file
+    }
+
+
     suspend fun exportarLogsComoCsv(context: Context, nomeArquivo: String = "relatorio_log.csv"): File {
         val db = AppDatabase.getInstance(context)
         val logs = db.logMapeamentoDao().listarTodos()
@@ -72,13 +108,14 @@ object LogHelper {
     }
 
 
+
     suspend fun exportarRelatorioMapeamentoXlsx(
         context: Context,
         usuario: String,
         arquivo: String,
         mapeamento: com.example.rktec_middleware.data.model.MapeamentoPlanilha,
         nomesColunas: List<String>
-    ): File {
+    ): File? {
         val dataHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
         val workbook = XSSFWorkbook()
         val sheet = workbook.createSheet("Relatório de Mapeamento")
@@ -108,9 +145,16 @@ object LogHelper {
 
         val pasta = criarPastaRelatorios(context)
         val file = File(pasta, "relatorio_de_mapeamento.xlsx")
-        FileOutputStream(file).use { workbook.write(it) }
-        workbook.close()
-        return file
+        try {
+            FileOutputStream(file).use { workbook.write(it) }
+            workbook.close()
+            return file
+        } catch (e: Exception) {
+            e.printStackTrace()
+            workbook.close()
+            return null
+        }
     }
+
 }
 

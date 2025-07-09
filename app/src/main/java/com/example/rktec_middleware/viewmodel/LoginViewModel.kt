@@ -1,13 +1,13 @@
 package com.example.rktec_middleware.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.example.rktec_middleware.data.model.TipoUsuario
+import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.repository.UsuarioRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-
-
+import kotlinx.coroutines.launch
 
 sealed class LoginState {
     object Idle : LoginState()
@@ -16,7 +16,9 @@ sealed class LoginState {
     data class Erro(val mensagem: String) : LoginState()
 }
 
-class LoginViewModel : ViewModel() {
+class LoginViewModel(
+    private val usuarioRepository: UsuarioRepository // agora injeta o repo!
+) : ViewModel() {
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState
 
@@ -26,14 +28,19 @@ class LoginViewModel : ViewModel() {
             .addOnSuccessListener { result ->
                 val user = result.user
                 if (user != null) {
-                    // Aqui você pode criar o seu objeto Usuario se quiser, com displayName e email do Firebase
-                    val usuario = Usuario(
-                        nome = user.displayName ?: "",
-                        email = user.email ?: "",
-                        senhaHash = "",
-                        tipo = TipoUsuario.MEMBRO
-                    )
-                    _loginState.value = LoginState.Sucesso(usuario)
+                    // Agora faz a busca no Room!
+                    viewModelScope.launch {
+                        val usuarioRoom = usuarioRepository.buscarPorEmail(user.email ?: "")
+                        if (usuarioRoom == null) {
+                            FirebaseAuth.getInstance().signOut()
+                            _loginState.value = LoginState.Erro("Usuário não encontrado no sistema, fale com o administrador.")
+                        } else if (!usuarioRoom.ativo) {
+                            FirebaseAuth.getInstance().signOut()
+                            _loginState.value = LoginState.Erro("Usuário desativado. Peça ao administrador para reativar sua conta.")
+                        } else {
+                            _loginState.value = LoginState.Sucesso(usuarioRoom)
+                        }
+                    }
                 } else {
                     _loginState.value = LoginState.Erro("Usuário não encontrado!")
                 }

@@ -1,12 +1,15 @@
 package com.example.rktec_middleware.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.rktec_middleware.data.model.TipoUsuario
+import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.repository.UsuarioRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-
-
+import kotlinx.coroutines.launch
 
 sealed class CadastroState {
     object Idle : CadastroState()
@@ -15,7 +18,9 @@ sealed class CadastroState {
     data class Erro(val mensagem: String) : CadastroState()
 }
 
-class CadastroViewModel : ViewModel() {
+class CadastroViewModel(
+    private val usuarioRepository: UsuarioRepository
+) : ViewModel() {
     private val _cadastroState = MutableStateFlow<CadastroState>(CadastroState.Idle)
     val cadastroState: StateFlow<CadastroState> = _cadastroState
 
@@ -27,7 +32,22 @@ class CadastroViewModel : ViewModel() {
                 user?.updateProfile(
                     UserProfileChangeRequest.Builder().setDisplayName(nome).build()
                 )?.addOnCompleteListener {
-                    _cadastroState.value = CadastroState.Sucesso
+                    // Salva o usuário no Room depois de criar no Firebase Auth
+                    viewModelScope.launch {
+                        try {
+                            val usuario = Usuario(
+                                nome = nome,
+                                email = email,
+                                senhaHash = senha.hashCode().toString(), // Use um hash seguro depois!
+                                tipo = TipoUsuario.MEMBRO,
+                                ativo = true
+                            )
+                            usuarioRepository.cadastrarUsuario(usuario)
+                            _cadastroState.value = CadastroState.Sucesso
+                        } catch (e: Exception) {
+                            _cadastroState.value = CadastroState.Erro("Erro ao salvar local: ${e.message}")
+                        }
+                    }
                 }
             }
             .addOnFailureListener { e ->
@@ -39,4 +59,3 @@ class CadastroViewModel : ViewModel() {
         _cadastroState.value = CadastroState.Idle
     }
 }
-

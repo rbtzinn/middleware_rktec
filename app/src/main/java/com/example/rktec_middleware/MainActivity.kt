@@ -1,6 +1,6 @@
 package com.example.rktec_middleware
 
-import TelaImportacao
+import com.example.rktec_middleware.ui.screens.TelaImportacao
 import android.os.Bundle
 import android.view.KeyEvent
 import android.util.Log
@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rktec_middleware.ui.screens.TelaLeituraColeta
 import com.example.rktec_middleware.viewmodel.RfidViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
@@ -17,6 +18,7 @@ import com.example.rktec_middleware.ui.screens.TelaInventario
 import com.example.rktec_middleware.ui.screens.TelaLeituraInventario
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.data.model.LogMapeamento
 import com.example.rktec_middleware.ui.screens.TelaDebug
 import com.example.rktec_middleware.ui.screens.TelaSobre
 import com.example.rktec_middleware.ui.screens.FluxoAutenticacao
@@ -25,10 +27,9 @@ import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.screens.TelaGerenciamentoUsuarios
 import com.example.rktec_middleware.util.UsuarioLogadoManager
-import com.example.rktec_middleware.viewmodel.LoginViewModel
-import com.example.rktec_middleware.viewmodel.RecuperarSenhaViewModel
-import com.example.rktec_middleware.viewmodel.CadastroViewModel
+import com.example.rktec_middleware.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
+import com.example.rktec_middleware.viewmodel.AuthViewModelFactory
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: RfidViewModel
@@ -43,73 +44,75 @@ class MainActivity : ComponentActivity() {
 
         val appDatabase = AppDatabase.getInstance(applicationContext)
         val usuarioRepository = UsuarioRepository(appDatabase.usuarioDao())
-        val loginViewModel = LoginViewModel()
-        val recuperarSenhaViewModel = RecuperarSenhaViewModel()
-        val cadastroViewModel = CadastroViewModel()
+
         setContent {
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
 
-            var usuarioAutenticado by remember { mutableStateOf<Usuario?>(null) }
-            var mapeamentoConcluido by remember { mutableStateOf(false) }
+            val authViewModel: AuthViewModel = viewModel(
+                factory = AuthViewModelFactory(usuarioRepository)
+            )
+            val usuarioAutenticado by authViewModel.usuarioAutenticado.collectAsState()
+            val mapeamentoConcluido by authViewModel.mapeamentoConcluido.collectAsState()
+
             var telaAtual by remember { mutableStateOf("menu") }
             var refreshDebug by remember { mutableStateOf(0) }
             var filtroLoja by remember { mutableStateOf<String?>(null) }
             var filtroSetor by remember { mutableStateOf<String?>(null) }
             var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
             var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-            var inicializado by remember { mutableStateOf(false) }
 
             // ------- AUTO LOGIN AO ABRIR O APP (SÓ UMA VEZ) -------
             LaunchedEffect(Unit) {
                 Log.d("RKTEC", "INICIANDO AUTOLOGIN")
-                val emailSalvo = UsuarioLogadoManager.obterUsuario(context)
-                Log.d("RKTEC", "Email salvo nas prefs: $emailSalvo")
-                if (!emailSalvo.isNullOrBlank()) {
-                    val usuario = usuarioRepository.buscarPorEmail(emailSalvo)
-                    Log.d("RKTEC", "Usuário retornado do Room: $usuario")
-                    if (usuario != null) {
-                        usuarioAutenticado = usuario
-                        val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
-                        mapeamentoConcluido = mapeamento != null
-                    }
+                authViewModel.autoLogin(context) {
+                    // callback: retorna se tem mapeamento concluído
+                    appDatabase.mapeamentoDao().buscarPrimeiro() != null
                 }
             }
 
             // ------- FLUXO DE LOGIN/CADASTRO --------
             if (usuarioAutenticado == null) {
                 FluxoAutenticacao(
-                    loginViewModel = loginViewModel,
-                    recuperarSenhaViewModel = recuperarSenhaViewModel,
-                    cadastroViewModel = cadastroViewModel,
+                    usuarioRepository = usuarioRepository,
                     aoLoginSucesso = { usuario ->
-                        usuarioAutenticado = usuario
+                        authViewModel.login(context, usuario)
                         scope.launch {
-                            Log.d("RKTEC", "Salvando login: ${usuario.email}")
-                            UsuarioLogadoManager.salvarUsuario(context, usuario.email)
                             val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
-                            mapeamentoConcluido = mapeamento != null
+                            authViewModel.setMapeamentoConcluido(mapeamento != null)
                         }
                     }
                 )
                 return@setContent
             }
+
             // ----------- FLUXO DE MAPA/IMPORTAÇÃO -------------
             if (!mapeamentoConcluido) {
                 TelaImportacao(
-                    onConcluido = {
-                        mapeamentoConcluido = true
-                        refreshDebug++
-                        telaAtual = "menu"
+                    onConcluido = { nomeArquivo ->
+                        // Aqui faz o insert do log
+                        scope.launch {
+                            val usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email ?: ""
+                            val dataHora = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                            val log = LogMapeamento(
+                                usuario = usuario,
+                                dataHora = dataHora,
+                                arquivo = nomeArquivo
+                            )
+                            appDatabase.logMapeamentoDao().inserir(log)
+                            authViewModel.setMapeamentoConcluido(true)
+                            refreshDebug++
+                            telaAtual = "menu"
+                        }
                     },
                     appDatabase = appDatabase,
-                    usuario = usuarioAutenticado?.nome ?: "",
+                    usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email ?: "",
                     onDebugClick = { telaAtual = "debug" },
                     onSobreClick = { telaAtual = "sobre" }
                 )
+
                 return@setContent
             }
-
             // ----------- MENU E OUTRAS TELAS -----------
             when (telaAtual) {
                 "menu" -> TelaPrincipal(
@@ -121,9 +124,7 @@ class MainActivity : ComponentActivity() {
                     onSairClick = {
                         scope.launch {
                             Log.d("RKTEC", "Logout: limpando email salvo")
-                            UsuarioLogadoManager.limparUsuario(context)
-                            usuarioAutenticado = null
-                            mapeamentoConcluido = false
+                            authViewModel.logout(context)
                             telaAtual = "menu"
                         }
                     },
@@ -159,7 +160,7 @@ class MainActivity : ComponentActivity() {
                     refresh = refreshDebug,
                     onVoltar = { telaAtual = "menu" },
                     onBancoLimpo = {
-                        mapeamentoConcluido = false
+                        authViewModel.setMapeamentoConcluido(false)
                         telaAtual = "menu"
                     }
                 )
