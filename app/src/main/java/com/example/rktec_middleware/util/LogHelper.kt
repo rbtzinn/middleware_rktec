@@ -22,7 +22,7 @@ object LogHelper {
         detalhes: String
     ) {
         val dataHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-        val db = AppDatabase.getInstance(context)
+        val db = AppDatabase.getInstance(context.applicationContext)
         db.logGerenciamentoUsuarioDao().inserir(
             LogGerenciamentoUsuario(
                 usuarioResponsavel = usuarioResponsavel,
@@ -34,6 +34,7 @@ object LogHelper {
             )
         )
     }
+
 
 
     suspend fun registrarMapeamento(context: Context, usuario: String, arquivo: String) {

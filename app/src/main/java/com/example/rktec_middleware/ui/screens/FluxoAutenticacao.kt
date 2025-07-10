@@ -27,11 +27,16 @@ fun FluxoAutenticacao(
     var telaAtual by remember { mutableStateOf(TelaAutenticacao.LOGIN) }
     var emailSalvo by remember { mutableStateOf("") }
 
+    // ---- RESET DE ESTADO DO LOGIN SEMPRE QUE VOLTAR PRA TELA DE LOGIN ----
+    LaunchedEffect(telaAtual) {
+        if (telaAtual == TelaAutenticacao.LOGIN) {
+            loginViewModel.resetarEstado()
+        }
+    }
+
     when (telaAtual) {
         TelaAutenticacao.LOGIN -> TelaLogin(
-            onLoginSucesso = {
-                aoLoginSucesso(it)
-            },
+            onLoginSucesso = { aoLoginSucesso(it) },
             onEsqueciSenha = { email ->
                 emailSalvo = email
                 telaAtual = TelaAutenticacao.ESQUECI_SENHA

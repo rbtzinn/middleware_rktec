@@ -53,6 +53,10 @@ fun TelaLogin(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
+        viewModel.resetarEstado()
+    }
+
+    LaunchedEffect(Unit) {
         // Evite travar a UI: rode no IO dispatcher
         scope.launch(Dispatchers.IO) {
             emailsCadastrados = appDatabase.usuarioDao().listarEmails()

@@ -1,35 +1,26 @@
 package com.example.rktec_middleware
 
-import com.example.rktec_middleware.ui.screens.TelaImportacao
 import android.os.Bundle
-import android.view.KeyEvent
 import android.util.Log
-import android.net.Uri
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.rktec_middleware.ui.screens.TelaLeituraColeta
-import com.example.rktec_middleware.viewmodel.RfidViewModel
-import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
-import com.example.rktec_middleware.ui.screens.TelaInventario
-import com.example.rktec_middleware.ui.screens.TelaLeituraInventario
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.LogMapeamento
-import com.example.rktec_middleware.ui.screens.TelaDebug
-import com.example.rktec_middleware.ui.screens.TelaSobre
-import com.example.rktec_middleware.ui.screens.FluxoAutenticacao
-import com.example.rktec_middleware.ui.screens.TelaPrincipal
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.ui.screens.TelaGerenciamentoUsuarios
+import com.example.rktec_middleware.ui.screens.*
 import com.example.rktec_middleware.util.UsuarioLogadoManager
 import com.example.rktec_middleware.viewmodel.AuthViewModel
-import kotlinx.coroutines.launch
 import com.example.rktec_middleware.viewmodel.AuthViewModelFactory
+import com.example.rktec_middleware.viewmodel.RfidViewModel
+import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: RfidViewModel
@@ -55,82 +46,96 @@ class MainActivity : ComponentActivity() {
             val usuarioAutenticado by authViewModel.usuarioAutenticado.collectAsState()
             val mapeamentoConcluido by authViewModel.mapeamentoConcluido.collectAsState()
 
-            var telaAtual by remember { mutableStateOf("menu") }
+            // 🔥 NOVO: Agora telaAtual só muda por este bloco! 🔥
+            var telaAtual by remember { mutableStateOf("login") }
             var refreshDebug by remember { mutableStateOf(0) }
             var filtroLoja by remember { mutableStateOf<String?>(null) }
             var filtroSetor by remember { mutableStateOf<String?>(null) }
             var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
             var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+            val usuarioDao = AppDatabase.getInstance(context).usuarioDao()
 
-            // ------- AUTO LOGIN AO ABRIR O APP (SÓ UMA VEZ) -------
+            // --------- AUTOLOGIN (SÓ UMA VEZ) ---------
             LaunchedEffect(Unit) {
                 Log.d("RKTEC", "INICIANDO AUTOLOGIN")
                 authViewModel.autoLogin(context) {
-                    // callback: retorna se tem mapeamento concluído
                     appDatabase.mapeamentoDao().buscarPrimeiro() != null
                 }
             }
-
-            // ------- FLUXO DE LOGIN/CADASTRO --------
-            if (usuarioAutenticado == null) {
-                FluxoAutenticacao(
-                    usuarioRepository = usuarioRepository,
-                    aoLoginSucesso = { usuario ->
-                        authViewModel.login(context, usuario)
-                        scope.launch {
-                            val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
-                            authViewModel.setMapeamentoConcluido(mapeamento != null)
-                        }
-                    }
-                )
-                return@setContent
+            // 🔥 NOVO: O ÚNICO responsável por trocar entre login/menu 🔥
+            LaunchedEffect(usuarioAutenticado) {
+                if (usuarioAutenticado == null) {
+                    telaAtual = "login"
+                } else if (telaAtual == "login") {
+                    telaAtual = "menu"
+                }
             }
 
-            // ----------- FLUXO DE MAPA/IMPORTAÇÃO -------------
-            if (!mapeamentoConcluido) {
-                TelaImportacao(
-                    onConcluido = { nomeArquivo ->
-                        // Aqui faz o insert do log
-                        scope.launch {
-                            val usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email ?: ""
-                            val dataHora = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                            val log = LogMapeamento(
-                                usuario = usuario,
-                                dataHora = dataHora,
-                                arquivo = nomeArquivo
-                            )
-                            appDatabase.logMapeamentoDao().inserir(log)
-                            authViewModel.setMapeamentoConcluido(true)
-                            refreshDebug++
-                            telaAtual = "menu"
-                        }
-                    },
-                    appDatabase = appDatabase,
-                    usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email ?: "",
-                    onDebugClick = { telaAtual = "debug" },
-                    onSobreClick = { telaAtual = "sobre" }
-                )
-
-                return@setContent
-            }
-            // ----------- MENU E OUTRAS TELAS -----------
+            // ----------- FLUXO DE TELAS -----------
             when (telaAtual) {
-                "menu" -> TelaPrincipal(
-                    onColetaClick = { telaAtual = "leitura" },
-                    onInventarioClick = { telaAtual = "inventario" },
-                    onDebugClick = { telaAtual = "debug" },
-                    onSobreClick = { telaAtual = "sobre" },
-                    nomeUsuario = usuarioAutenticado?.nome ?: "",
-                    onSairClick = {
-                        scope.launch {
-                            Log.d("RKTEC", "Logout: limpando email salvo")
-                            authViewModel.logout(context)
-                            telaAtual = "menu"
+                "login" -> {
+                    FluxoAutenticacao(
+                        usuarioRepository = usuarioRepository,
+                        aoLoginSucesso = { usuarioNovo ->
+                            if (authViewModel.usuarioAutenticado.value?.email != usuarioNovo.email) {
+                                Log.d("RKTEC_DEBUG", "CHAMOU onLoginSucesso com ${usuarioNovo.email}")
+                                authViewModel.login(context, usuarioNovo)
+                                scope.launch {
+                                    val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro()
+                                    authViewModel.setMapeamentoConcluido(mapeamento != null)
+                                }
+                                // NÃO seta telaAtual aqui — controle é do LaunchedEffect!
+                            } else {
+                                Log.d("RKTEC_DEBUG", "Ignorou login duplicado de ${usuarioNovo.email}")
+                            }
                         }
-                    },
-                    onGerenciarUsuariosClick = { telaAtual = "usuarios" }
-                )
-
+                    )
+                }
+                // Mapeamento
+                "menu" -> {
+                    if (!mapeamentoConcluido) {
+                        TelaImportacao(
+                            onConcluido = { nomeArquivo ->
+                                scope.launch {
+                                    val usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email ?: ""
+                                    val dataHora = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                                    val log = LogMapeamento(
+                                        usuario = usuario,
+                                        dataHora = dataHora,
+                                        arquivo = nomeArquivo
+                                    )
+                                    appDatabase.logMapeamentoDao().inserir(log)
+                                    authViewModel.setMapeamentoConcluido(true)
+                                    refreshDebug++
+                                    telaAtual = "menu"
+                                }
+                            },
+                            appDatabase = appDatabase,
+                            usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email ?: "",
+                            onDebugClick = { telaAtual = "debug" },
+                            onSobreClick = { telaAtual = "sobre" }
+                        )
+                    } else {
+                        // Tela principal do app
+                        TelaPrincipal(
+                            usuarioDao = usuarioDao,
+                            authViewModel = authViewModel,
+                            onColetaClick = { telaAtual = "leitura" },
+                            onInventarioClick = { telaAtual = "inventario" },
+                            onDebugClick = { telaAtual = "debug" },
+                            onSobreClick = { telaAtual = "sobre" },
+                            onSairClick = {
+                                scope.launch {
+                                    authViewModel.logout(context)
+                                    // Aguarda um frame pra garantir limpeza antes de recompor
+                                    kotlinx.coroutines.delay(150)
+                                    // telaAtual vai pra login pelo LaunchedEffect
+                                }
+                            },
+                            onGerenciarUsuariosClick = { telaAtual = "usuarios" }
+                        )
+                    }
+                }
                 "leitura" -> TelaLeituraColeta(
                     viewModel = viewModel,
                     onVoltar = { telaAtual = "menu" }
@@ -167,13 +172,10 @@ class MainActivity : ComponentActivity() {
                 "sobre" -> TelaSobre(
                     onVoltar = { telaAtual = "menu" }
                 )
-                // ----------- GERENCIAMENTO DE USUÁRIOS -----------
                 "usuarios" -> {
                     var usuarios by remember { mutableStateOf<List<Usuario>>(emptyList()) }
                     val refreshUsuarios: () -> Unit = {
-                        scope.launch {
-                            usuarios = usuarioRepository.listarTodos()
-                        }
+                        scope.launch { usuarios = usuarioRepository.listarTodos() }
                     }
                     LaunchedEffect(telaAtual) {
                         if (telaAtual == "usuarios") {
@@ -183,9 +185,14 @@ class MainActivity : ComponentActivity() {
                     TelaGerenciamentoUsuarios(
                         usuarios = usuarios,
                         usuarioRepository = usuarioRepository,
-                        usuarioLogado = usuarioAutenticado?.nome ?: "",
+                        usuarioLogadoEmail = usuarioAutenticado?.email ?: "",
                         context = context,
-                        onAtualizarLista = refreshUsuarios,
+                        onAtualizarLista = { usuarioEditadoEmail ->
+                            refreshUsuarios()
+                            if (usuarioEditadoEmail == usuarioAutenticado?.email) {
+                                authViewModel.recarregarUsuario(usuarioEditadoEmail)
+                            }
+                        },
                         onVoltar = { telaAtual = "menu" }
                     )
                 }

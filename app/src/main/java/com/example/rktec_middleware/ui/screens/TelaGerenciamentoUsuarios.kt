@@ -40,9 +40,9 @@ private val CorTexto = Color(0xFF1B2A3A)
 fun TelaGerenciamentoUsuarios(
     usuarios: List<Usuario>,
     usuarioRepository: UsuarioRepository,
-    usuarioLogado: String,
+    usuarioLogadoEmail: String, // email do user autenticado
     context: Context,
-    onAtualizarLista: () -> Unit,
+    onAtualizarLista: (String) -> Unit, // recebe email do usuário editado
     onVoltar: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -94,6 +94,7 @@ fun TelaGerenciamentoUsuarios(
                 contentPadding = PaddingValues(horizontal = 18.dp)
             ) {
                 items(usuarios) { usuario ->
+                    val isSelf = usuario.email == usuarioLogadoEmail
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -166,18 +167,21 @@ fun TelaGerenciamentoUsuarios(
                                         tint = AzulRktec
                                     )
                                 }
-                                IconButton(
-                                    onClick = {
-                                        usuarioParaExcluir = usuario
-                                        motivoExclusao = ""
-                                        mostrandoDialogoExcluir = true
+                                // NÃO deixa o usuário se autodesativar!
+                                if (!isSelf) {
+                                    IconButton(
+                                        onClick = {
+                                            usuarioParaExcluir = usuario
+                                            motivoExclusao = ""
+                                            mostrandoDialogoExcluir = true
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Delete,
+                                            contentDescription = if (usuario.ativo) "Desativar" else "Ativar",
+                                            tint = if (usuario.ativo) Color(0xFFD32F2F) else Color(0xFF4CAF50)
+                                        )
                                     }
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Delete,
-                                        contentDescription = if (usuario.ativo) "Desativar" else "Ativar",
-                                        tint = if (usuario.ativo) Color(0xFFD32F2F) else Color(0xFF4CAF50)
-                                    )
                                 }
                             }
                         }
@@ -233,7 +237,7 @@ fun TelaGerenciamentoUsuarios(
                                         usuarioRepository.atualizarUsuario(usuarioAtualizado)
                                         val arquivo = LogUtil.logAcaoGerenciamentoUsuario(
                                             context = context,
-                                            usuarioResponsavel = usuarioLogado,
+                                            usuarioResponsavel = usuarioLogadoEmail,
                                             acao = "EDIÇÃO",
                                             usuarioAlvo = usuarioAtualizado.email,
                                             detalhes = "Nome antigo: ${it.nome}, novo: $nomeEditado | Tipo: ${it.tipo.name} → ${tipoEditado.name}"
@@ -251,7 +255,8 @@ fun TelaGerenciamentoUsuarios(
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         }
-                                        onAtualizarLista()
+                                        // Chama o callback passando o email do usuário editado!
+                                        onAtualizarLista(usuarioAtualizado.email)
                                     }
                                 }
                             },
@@ -318,7 +323,7 @@ fun TelaGerenciamentoUsuarios(
                                             usuarioRepository.setUsuarioAtivo(usuario.email, false)
                                             val arquivo = LogUtil.logAcaoGerenciamentoUsuario(
                                                 context = context,
-                                                usuarioResponsavel = usuarioLogado,
+                                                usuarioResponsavel = usuarioLogadoEmail,
                                                 acao = "DESATIVAÇÃO",
                                                 usuarioAlvo = usuario.email,
                                                 motivo = motivoExclusao,
@@ -341,7 +346,7 @@ fun TelaGerenciamentoUsuarios(
                                             usuarioRepository.setUsuarioAtivo(usuario.email, true)
                                             val arquivo = LogUtil.logAcaoGerenciamentoUsuario(
                                                 context = context,
-                                                usuarioResponsavel = usuarioLogado,
+                                                usuarioResponsavel = usuarioLogadoEmail,
                                                 acao = "REATIVAÇÃO",
                                                 usuarioAlvo = usuario.email,
                                                 detalhes = "Usuário reativado: ${usuario.nome} (${usuario.email})"
@@ -360,7 +365,8 @@ fun TelaGerenciamentoUsuarios(
                                                 ).show()
                                             }
                                         }
-                                        onAtualizarLista()
+                                        // Atualiza lista e ViewModel se necessário
+                                        onAtualizarLista(usuario.email)
                                     }
                                     motivoExclusao = ""
                                 }

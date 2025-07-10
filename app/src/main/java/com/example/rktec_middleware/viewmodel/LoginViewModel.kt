@@ -17,7 +17,7 @@ sealed class LoginState {
 }
 
 class LoginViewModel(
-    private val usuarioRepository: UsuarioRepository // agora injeta o repo!
+    private val usuarioRepository: UsuarioRepository
 ) : ViewModel() {
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState
@@ -28,7 +28,6 @@ class LoginViewModel(
             .addOnSuccessListener { result ->
                 val user = result.user
                 if (user != null) {
-                    // Agora faz a busca no Room!
                     viewModelScope.launch {
                         val usuarioRoom = usuarioRepository.buscarPorEmail(user.email ?: "")
                         if (usuarioRoom == null) {
@@ -48,5 +47,10 @@ class LoginViewModel(
             .addOnFailureListener { e ->
                 _loginState.value = LoginState.Erro(e.message ?: "Erro ao logar!")
             }
+    }
+
+    // NOVO: Método pra resetar o estado
+    fun resetarEstado() {
+        _loginState.value = LoginState.Idle
     }
 }
