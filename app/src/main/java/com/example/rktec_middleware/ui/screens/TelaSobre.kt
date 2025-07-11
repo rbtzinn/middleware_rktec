@@ -1,68 +1,72 @@
 package com.example.rktec_middleware.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import com.example.rktec_middleware.R
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.IntegrationInstructions
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.ImportantDevices
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SettingsInputAntenna
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-
 @Composable
 fun TelaSobre(onVoltar: () -> Unit) {
-    val gradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFF174D86), Color(0xFF4A90E2)),
-        startY = 0f,
-        endY = 1000f
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
     ) {
 
+        // Header com gradiente sutil
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(88.dp)
+                .height(92.dp)
                 .background(
                     Brush.verticalGradient(
-                        0f to Color(0xFF174D86),
-                        1f to Color(0xFF4A90E2)
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.primaryContainer
+                        )
                     ),
                     shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
                 )
-                .shadow(16.dp, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                    spotColor = MaterialTheme.colorScheme.primary
+                )
         ) {
             IconButton(
                 onClick = { onVoltar() },
@@ -75,7 +79,7 @@ fun TelaSobre(onVoltar: () -> Unit) {
                     imageVector = Icons.Filled.ArrowBack,
                     contentDescription = "Voltar",
                     tint = Color.White,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 )
             }
 
@@ -83,13 +87,13 @@ fun TelaSobre(onVoltar: () -> Unit) {
                 "SOBRE O APLICATIVO",
                 color = Color.White,
                 fontSize = 20.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.align(Alignment.Center)
             )
         }
 
-        // Conteúdo principal com scroll
+        // Conteúdo principal
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -98,45 +102,35 @@ fun TelaSobre(onVoltar: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             item {
-                // Card com efeito de vidro (Glassmorphism)
-                Box(
+                // Card principal
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xAAFFFFFF),
-                                    Color(0xBBE6F0FF)
-                                )
-                            ),
-                            shape = RoundedCornerShape(32.dp)
-                        )
-                        .border(
-                            1.dp,
-                            Color(0x66FFFFFF),
-                            RoundedCornerShape(32.dp)
-                        )
-                        .padding(24.dp)
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 8.dp
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.padding(24.dp)
                     ) {
-                        // Logo/Ícone
-                        Box(
+                        // Logo com efeito de profundidade
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            tonalElevation = 8.dp,
                             modifier = Modifier
                                 .size(100.dp)
-                                .background(
-                                    Color(0xFF174D86),
-                                    CircleShape
-                                )
-                                .padding(16.dp)
+                                .shadow(12.dp, shape = CircleShape, spotColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ImportantDevices,
-                                contentDescription = "Logo",
+                                imageVector = Icons.Default.SettingsInputAntenna,
+                                contentDescription = "RFID Logo",
                                 tint = Color.White,
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .padding(16.dp)
                             )
                         }
 
@@ -144,19 +138,18 @@ fun TelaSobre(onVoltar: () -> Unit) {
 
                         Text(
                             "RKTEC MIDDLEWARE",
-                            fontSize = 22.sp,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Black,
-                            color = Color(0xFF0D3A6A),
                             letterSpacing = 1.2.sp
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            "Solução completa para gestão de ativos RFID",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF4A6580),
+                            "Solução profissional para inventário de ativos RFID",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             lineHeight = 24.sp
                         )
@@ -164,71 +157,66 @@ fun TelaSobre(onVoltar: () -> Unit) {
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Divider(
-                            color = Color(0x55174D86),
-                            thickness = 1.dp,
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(24.dp))
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            thickness = 1.dp )
 
                         FeatureItem(
                             icon = Icons.Default.Storage,
-                            title = "Controle de Inventário",
-                            description = "Leitura e gerenciamento de tags RFID em tempo real"
+                            title = "Banco de Dados Local (SQLite)",
+                            description = "Armazenamento eficiente e offline de dados de inventário."
+                        )
+
+                        FeatureItem(
+                            icon = Icons.Default.Security,
+                            title = "Integração com Firebase",
+                            description = "Sincronização segura e escalável com a nuvem via Firebase."
                         )
 
                         FeatureItem(
                             icon = Icons.Default.IntegrationInstructions,
-                            title = "Integração com Planilhas",
-                            description = "Exportação para Excel e Google Sheets"
+                            title = "Exportação para Planilhas",
+                            description = "Geração de relatórios em Excel e compatibilidade com Google Sheets."
                         )
 
-                        FeatureItem(
-                            icon = Icons.Default.CloudUpload,
-                            title = "Cloud Sync",
-                            description = "Sincronização segura com servidores na nuvem"
-                        )
-
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
                             "Versão 1.0.0",
-                            fontSize = 14.sp,
-                            color = Color(0xFF6B8DB4),
-                            fontWeight = FontWeight.Medium
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(top = 8.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Equipe de desenvolvimento
+                // Seção da equipe
                 TeamSection()
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 
-        // Footer com micro-interação
+
+        // Footer
         Surface(
-            color = Color(0x990D3A6A),
-            tonalElevation = 8.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+            tonalElevation = 4.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp)
         ) {
             Text(
                 "© 2024 RKTEC TECNOLOGIAS | TODOS OS DIREITOS RESERVADOS",
                 fontSize = 12.sp,
-                color = Color(0xFFA3C5FF),
+                color = Color.White,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .padding(vertical = 12.dp)
                     .fillMaxWidth()
-                    .clickable { /* Abrir website */ }
                     .pointerInput(Unit) {
                         detectTapGestures(
-                            onPress = { /* Efeito de feedback */ },
-                            onTap = { /* Ação */ }
+                            onTap = {
+                                // Opcional: abrir site
+                            }
                         )
                     }
             )
@@ -241,14 +229,13 @@ fun FeatureItem(icon: ImageVector, title: String, description: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp)
-            .padding(horizontal = 8.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Color(0xFF174D86),
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(28.dp)
         )
 
@@ -257,14 +244,14 @@ fun FeatureItem(icon: ImageVector, title: String, description: String) {
         Column {
             Text(
                 title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF0D3A6A)
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 description,
-                fontSize = 14.sp,
-                color = Color(0xFF4A6580),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 20.sp
             )
         }
@@ -276,61 +263,131 @@ fun TeamSection() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0x22000000), RoundedCornerShape(24.dp))
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(16.dp)
+            )
             .padding(24.dp)
     ) {
         Text(
-            "DESENVOLVIDO POR",
-            fontSize = 14.sp,
-            color = Color.Black, // <-- Alterado pra preto
+            "EQUIPE DE DESENVOLVIMENTO",
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        TeamMember("Roberto Gabriel", "Tech Lead")
-        TeamMember("Kawã Vinicius", "Mobile Developer")
-        TeamMember("Equipe RKTEC", "Engenharia & Design")
+        TeamMember(
+            name = "Roberto Gabriel",
+            role = "Tech Lead",
+            photoRes = R.drawable.foto_roberto,
+            linkedinUrl = "https://www.linkedin.com/in/roberto-gabriel-ara%C3%BAjo-miranda/",
+            githubUrl = "https://github.com/rbtzinn",
+            instagramUrl = "https://instagram.com/rgabriel.04"
+        )
+
+        TeamMember(
+            name = "Kawã Vinicius",
+            role = "Mobile Developer",
+            photoRes = R.drawable.foto_kawa,
+            linkedinUrl = "https://www.linkedin.com/in/kaw%C3%A3-vin%C3%ADcius-020438243/",
+            githubUrl = "https://github.com/IVCOLT",
+            instagramUrl = "https://instagram.com/vini_2oo4"
+        )
     }
 }
 
 @Composable
-fun TeamMember(name: String, role: String) {
-    Row(
+fun TeamMember(
+    name: String,
+    role: String,
+    photoRes: Int,
+    linkedinUrl: String?,
+    githubUrl: String?,
+    instagramUrl: String?
+) {
+    val expanded = remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 8.dp)
+            .clickable { expanded.value = !expanded.value }
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .background(Color(0x55FFFFFF), CircleShape)
-                .padding(8.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null,
-                tint = Color(0xFF174D86), // Azul institucional p/ contraste no branco
-                modifier = Modifier.fillMaxSize()
+            Image(
+                painter = painterResource(id = photoRes),
+                contentDescription = "Foto de $name",
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
             )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    role,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        AnimatedVisibility(visible = expanded.value) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, start = 64.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                linkedinUrl?.let {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_linkedin),
+                            contentDescription = "LinkedIn",
+                        )
+                    }
+                }
 
-        Column {
-            Text(
-                name,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black // <-- Alterado pra preto
-            )
-            Text(
-                role,
-                fontSize = 14.sp,
-                color = Color(0xFF174D86) // Azul institucional pra destacar
-            )
+                githubUrl?.let {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_github),
+                            contentDescription = "GitHub",
+                            tint = Color.Black
+                        )
+                    }
+                }
+
+                instagramUrl?.let {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_instagram),
+                            contentDescription = "Instagram",
+                        )
+                    }
+                }
+            }
         }
     }
 }
-

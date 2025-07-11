@@ -6,16 +6,22 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.db.AppDatabase
@@ -36,18 +42,16 @@ fun TelaImportacao(
     var erro by remember { mutableStateOf<String?>(null) }
     var permissaoConcedida by remember { mutableStateOf(true) }
 
-    // 1. Lançador de permissão para Android < 10
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
             permissaoConcedida = granted
             if (!granted) {
-                erro = "Permissão de armazenamento negada. Não é possível salvar arquivos de relatório."
+                erro = "Permissão de armazenamento negada."
             }
         }
     )
 
-    // 2. Pede permissão logo que entra na tela (Android < 10)
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             permissaoConcedida = false
@@ -55,15 +59,10 @@ fun TelaImportacao(
         }
     }
 
-    // Lançador pra escolher arquivo
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
-            if (uri != null) {
-                uriParaMapeamento = uri
-            } else {
-                erro = "Nenhum arquivo selecionado"
-            }
+            uri?.let { uriParaMapeamento = it } ?: run { erro = "Nenhum arquivo selecionado" }
         }
     )
 
@@ -73,14 +72,13 @@ fun TelaImportacao(
             usuarioLogado = usuario,
             onSalvar = { mapeamento, nomesColunas ->
                 scope.launch {
-                    val contentResolver = context.contentResolver
-                    val mime = contentResolver.getType(uriParaMapeamento!!) ?: ""
-                    val extension = android.webkit.MimeTypeMap.getSingleton()
+                    val mime = context.contentResolver.getType(uriParaMapeamento!!) ?: ""
+                    val ext = android.webkit.MimeTypeMap.getSingleton()
                         .getExtensionFromMimeType(mime)?.lowercase()
-                        ?: uriParaMapeamento!!.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
+                        ?: uriParaMapeamento!!.lastPathSegment?.substringAfterLast('.')?.lowercase()
                         ?: ""
 
-                    val lista = when (extension) {
+                    val lista = when (ext) {
                         "csv" -> com.example.rktec_middleware.util.LeitorInventario.lerCsv(context, uriParaMapeamento!!, mapeamento)
                         "xls", "xlsx" -> com.example.rktec_middleware.util.LeitorInventario.lerExcel(context, uriParaMapeamento!!, mapeamento)
                         else -> emptyList()
@@ -88,28 +86,26 @@ fun TelaImportacao(
 
                     if (lista.isNotEmpty()) {
                         appDatabase.inventarioDao().inserirTodos(lista)
-                        val epcTags = lista.map { item ->
+                        val epcs = lista.map {
                             com.example.rktec_middleware.data.model.EpcTag(
-                                epc = item.tag,
-                                descricao = item.desc,
-                                setor = item.localizacao,
-                                loja = item.loja,
+                                epc = it.tag,
+                                descricao = it.desc,
+                                setor = it.localizacao,
+                                loja = it.loja,
                                 timestamp = System.currentTimeMillis()
                             )
                         }
-                        appDatabase.coletaDao().inserirTodos(epcTags)
+                        appDatabase.coletaDao().inserirTodos(epcs)
                     }
 
                     appDatabase.mapeamentoDao().inserir(mapeamento)
-
                     com.example.rktec_middleware.util.LogHelper.exportarRelatorioMapeamentoXlsx(
-                        context = context,
-                        usuario = usuario,
-                        arquivo = uriParaMapeamento!!.lastPathSegment ?: "",
-                        mapeamento = mapeamento,
-                        nomesColunas = nomesColunas
+                        context,
+                        usuario,
+                        uriParaMapeamento!!.lastPathSegment ?: "",
+                        mapeamento,
+                        nomesColunas
                     )
-
                     uriParaMapeamento = null
                     onConcluido("relatorio mapeamento.xlsx")
                 }
@@ -122,104 +118,101 @@ fun TelaImportacao(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(top = 32.dp, bottom = 24.dp)
+            .background(Color(0xFFF5F7FA))
     ) {
-        // Cabeçalho igual ao da tela principal
+        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
-                .offset(y = -32.dp)
+                .height(110.dp)
                 .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF4A90E2), Color(0xFF174D86))
+                    Brush.verticalGradient(
+                        0f to Color(0xFF174D86),
+                        1f to Color(0xFF4A90E2)
                     )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                "Importação de Planilha",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 32.dp)
-            )
-        }
-
-        // Conteúdo central da tela
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .weight(1f),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                "Importe sua planilha para começar",
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                color = Color(0xFF174D86)
-            )
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = { launcher.launch("*/*") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2)),
-                enabled = permissaoConcedida // Só habilita se tem permissão
-            ) {
-                Text("Selecionar planilha (.csv ou .xls)", fontSize = 20.sp, color = Color.White)
-            }
-            erro?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, color = Color.Red)
-            }
-        }
-
-        Divider(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            color = Color(0xFFE0E0E0),
-            thickness = 1.dp
-        )
-
-        // Footer igual ao padrão
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-        ) {
-            TextButton(
-                onClick = onDebugClick,
-            ) {
-                Text(
-                    "Ver debug de coletas",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
                 )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            TextButton(
-                onClick = onSobreClick,
+        ) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "RKTECNOLOGIAS",
+                    "Importar Planilha",
+                    color = Color.White,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF009688),
-                    fontSize = 16.sp
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.width(44.dp))
             }
-            Spacer(modifier = Modifier.height(2.dp))
+        }
+
+        // Card explicativo e ação
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = (-26).dp)
+                .padding(horizontal = 18.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "Importe a planilha base de inventário",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF174D86)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "O sistema vai considerar os dados dessa planilha como base para o inventário. Ela será usada para identificar os itens e construir o banco de dados.",
+                    fontSize = 15.sp,
+                    color = Color(0xFF555555)
+                )
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = { launcher.launch("*/*") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2)),
+                    enabled = permissaoConcedida
+                ) {
+                    Text(
+                        "Selecionar planilha (.csv ou .xls)",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                erro?.let {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(it, color = Color.Red, fontSize = 14.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Footer
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+        ) {
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onSobreClick) {
+                Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = Color(0xFF009688), fontSize = 15.sp)
+            }
             Text(
                 "Todos os direitos reservados — RKTECNOLOGIAS",
                 fontSize = 12.sp,
-                color = Color.Gray,
+                color = Color.Gray
             )
         }
     }
