@@ -356,9 +356,10 @@ fun TeamMember(
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
                         context.startActivity(intent)
                     }) {
-                        Icon(
+                        Image(
                             painter = painterResource(id = R.drawable.ic_linkedin),
                             contentDescription = "LinkedIn",
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
@@ -381,10 +382,12 @@ fun TeamMember(
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
                         context.startActivity(intent)
                     }) {
-                        Icon(
+                        Image(
                             painter = painterResource(id = R.drawable.ic_instagram),
                             contentDescription = "Instagram",
+                            modifier = Modifier.size(24.dp) // ou outro tamanho que quiser
                         )
+
                     }
                 }
             }

@@ -143,24 +143,27 @@ fun TelaPrincipal(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Opções avançadas
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 0.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                TextButton(
-                    onClick = onDebugClick,
-                    modifier = Modifier.padding(vertical = 8.dp)
+            // Opções avançadas (apenas para ADMIN)
+            if (usuario?.tipo == TipoUsuario.ADMIN) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 0.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        "Debug - banco de dados",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
+                    TextButton(
+                        onClick = onDebugClick,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        Text(
+                            "Debug - banco de dados",
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
             }
+
 
             // Footer minimalista
             Column(
