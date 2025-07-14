@@ -55,20 +55,30 @@ fun TelaInventario(
         dadosImportados = if (dadosSalvos.isNotEmpty()) dadosSalvos else emptyList()
     }
 
-    val lojas = dadosImportados
-        .map { it.loja.trim() }
-        .filter { it.isNotBlank() }
-        .distinct()
-
-    val setores = dadosImportados
-        .map { it.localizacao.trim() }
-        .filter { it.isNotBlank() }
-        .map {
-            it.toDoubleOrNull()?.let { d ->
-                if (d % 1.0 == 0.0) d.toInt().toString() else it
-            } ?: it
+    val lojasFiltradas by remember(filtroSetor, dadosImportados) {
+        derivedStateOf {
+            dadosImportados
+                .filter { item -> filtroSetor.isNullOrBlank() || item.localizacao.trim() == filtroSetor }
+                .map { it.loja.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
         }
-        .distinct()
+    }
+
+    val setoresFiltrados by remember(filtroLoja, dadosImportados) {
+        derivedStateOf {
+            dadosImportados
+                .filter { item -> filtroLoja.isNullOrBlank() || item.loja.trim() == filtroLoja }
+                .map { it.localizacao.trim() }
+                .filter { it.isNotBlank() }
+                .map {
+                    it.toDoubleOrNull()?.let { d ->
+                        if (d % 1.0 == 0.0) d.toInt().toString() else it
+                    } ?: it
+                }
+                .distinct()
+        }
+    }
 
     val listaFiltrada = dadosImportados.filter { item ->
         (filtroLoja.isNullOrEmpty() || item.loja.trim() == filtroLoja) &&
@@ -153,17 +163,21 @@ fun TelaInventario(
                 ) {
                     DropdownFiltroProfissional(
                         label = "Loja",
-                        opcoes = lojas,
+                        opcoes = lojasFiltradas,
                         selecionado = filtroLoja,
-                        onSelecionado = { filtroLoja = it },
+                        onSelecionado = {
+                            filtroLoja = it
+                            filtroSetor = null // resetar setor ao trocar loja
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     DropdownFiltroProfissional(
                         label = "Setor",
-                        opcoes = setores,
+                        opcoes = setoresFiltrados,
                         selecionado = filtroSetor,
                         onSelecionado = { filtroSetor = it },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !filtroLoja.isNullOrBlank()
                     )
                 }
 
@@ -328,14 +342,15 @@ fun DropdownFiltroProfissional(
     opcoes: List<String>,
     selecionado: String?,
     onSelecionado: (String?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true // <-- adicionado aqui
 ) {
     var expanded by remember { mutableStateOf(false) }
     val displayText = if (selecionado.isNullOrEmpty()) "Todos" else selecionado
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
+        onExpandedChange = { if (enabled) expanded = !expanded },
         modifier = modifier
     ) {
         OutlinedTextField(
@@ -344,44 +359,51 @@ fun DropdownFiltroProfissional(
             label = { Text(label, fontSize = 12.sp, color = Color(0xFF174D86)) },
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            enabled = enabled,
             modifier = Modifier
                 .menuAnchor()
-                .height(54.dp) // Altura menor!
+                .heightIn(min = 56.dp) // evita corte de texto
                 .clip(RoundedCornerShape(10.dp)),
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedBorderColor = Color(0xFFE0E0E0),
                 focusedBorderColor = Color(0xFF4A90E2),
                 focusedLabelColor = Color(0xFF174D86),
                 cursorColor = Color.Transparent,
-                disabledBorderColor = Color(0xFFE0E0E0),
+                disabledTextColor = Color(0xFFAAAAAA),
+                disabledBorderColor = Color(0xFFDDDDDD),
+                disabledLabelColor = Color(0xFFAAAAAA),
                 unfocusedContainerColor = Color.White
             ),
             singleLine = true,
             textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
         )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .background(Color.White)
-                .widthIn(min = 110.dp, max = 220.dp)
-        ) {
-            DropdownMenuItem(
-                text = { Text("Todos", fontWeight = if (selecionado == null) FontWeight.Bold else FontWeight.Normal) },
-                onClick = {
-                    onSelecionado(null)
-                    expanded = false
-                }
-            )
-            opcoes.forEach { opcao ->
+
+        if (enabled) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .background(Color.White)
+                    .widthIn(min = 110.dp, max = 220.dp)
+            ) {
                 DropdownMenuItem(
-                    text = { Text(opcao, fontWeight = if (selecionado == opcao) FontWeight.Bold else FontWeight.Normal) },
+                    text = { Text("Todos", fontWeight = if (selecionado == null) FontWeight.Bold else FontWeight.Normal) },
                     onClick = {
-                        onSelecionado(opcao)
+                        onSelecionado(null)
                         expanded = false
                     }
                 )
+                opcoes.forEach { opcao ->
+                    DropdownMenuItem(
+                        text = { Text(opcao, fontWeight = if (selecionado == opcao) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = {
+                            onSelecionado(opcao)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
 }
+
