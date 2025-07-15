@@ -8,11 +8,14 @@ import com.example.rktec_middleware.data.dao.LogMapeamentoDao
 import com.example.rktec_middleware.data.model.LogMapeamento
 import com.example.rktec_middleware.data.dao.ColetaDao
 import com.example.rktec_middleware.data.dao.InventarioDao
+import com.example.rktec_middleware.data.dao.LogEdicaoDao
 import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
 import com.example.rktec_middleware.data.dao.LogGerenciamentoUsuarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.data.dao.MapeamentoDao
+// NOVO: Import da nova classe de entidade
+import com.example.rktec_middleware.data.model.LogEdicaoItem
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.data.dao.UsuarioDao
@@ -24,9 +27,12 @@ import com.example.rktec_middleware.data.dao.UsuarioDao
         MapeamentoPlanilha::class,
         LogMapeamento::class,
         Usuario::class,
-        LogGerenciamentoUsuario::class
+        LogGerenciamentoUsuario::class,
+        // MODIFICADO: Adicionada a nova entidade à lista do banco de dados.
+        LogEdicaoItem::class
     ],
-    version = 12
+    // MODIFICADO: Versão incrementada de 12 para 13 devido à mudança na estrutura.
+    version = 13
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
@@ -35,6 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun logMapeamentoDao(): LogMapeamentoDao
     abstract fun usuarioDao(): UsuarioDao
     abstract fun logGerenciamentoUsuarioDao(): LogGerenciamentoUsuarioDao
+    abstract fun logEdicaoDao(): LogEdicaoDao
 
 
     companion object {
@@ -47,6 +54,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "rktec.db"
                 )
+                    // fallbackToDestructiveMigration irá apagar e recriar o banco
+                    // ao encontrar uma nova versão. Ideal para desenvolvimento.
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }

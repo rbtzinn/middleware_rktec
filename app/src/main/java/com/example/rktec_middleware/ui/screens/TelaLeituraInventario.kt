@@ -1,225 +1,218 @@
+// ui/screens/TelaLeituraInventario.kt
 package com.example.rktec_middleware.ui.screens
 
-import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
-import com.example.rktec_middleware.data.model.EpcTag
+import com.example.rktec_middleware.ui.components.PrimaryButton
+import com.example.rktec_middleware.ui.theme.*
+import com.example.rktec_middleware.util.LogHelper
 import com.example.rktec_middleware.viewmodel.RfidViewModel
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+private enum class StatusInventario {
+    VERDE, AMARELO, CINZA, VERMELHO, CORRIGIDO
+}
+
+@Composable
+private fun StatusInventario.toColor(): Color = when (this) {
+    StatusInventario.VERDE -> RktGreen
+    StatusInventario.AMARELO -> RktYellow
+    StatusInventario.CINZA -> RktTextSecondary
+    StatusInventario.VERMELHO -> MaterialTheme.colorScheme.error
+    StatusInventario.CORRIGIDO -> RktBlueInfo
+}
+
+@Composable
+private fun StatusInventario.toIcon() = when (this) {
+    StatusInventario.VERDE -> Icons.Default.CheckCircle
+    StatusInventario.AMARELO -> Icons.Default.Warning
+    StatusInventario.CINZA -> Icons.Default.Info
+    StatusInventario.VERMELHO -> Icons.Default.Error
+    StatusInventario.CORRIGIDO -> Icons.Default.PublishedWithChanges
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaLeituraInventario(
     onVoltar: () -> Unit,
     banco: AppDatabase,
+    usuarioLogado: String,
     listaFiltrada: List<ItemInventario>,
     listaTotal: List<ItemInventario>,
     filtroLoja: String?,
     filtroSetor: String?
 ) {
-    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<RfidViewModel>()
-    val tags by viewModel.tagList.collectAsState()
+    val viewModel = viewModel<RfidViewModel>()
+    val tagsLidas by viewModel.tagList.collectAsState()
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val tagsCorrigidasNaSessao = remember { mutableStateListOf<String>() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(top = 32.dp, bottom = 24.dp)
-    ) {
-        // CABEÇALHO - gradiente + botão voltar + título
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .offset(y = -32.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF4A90E2), Color(0xFF174D86))
-                    )
-                ),
-        ) {
-            IconButton(
-                onClick = onVoltar,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 8.dp, top = 32.dp)
-                    .size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            Text(
-                "INVENTÁRIO",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(top = 32.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            "Pressione o gatilho para ler",
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF4A90E2),
-            fontSize = 18.sp,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            "Total de tags lidas: ${tags.size}",
-            fontSize = 16.sp,
-            color = Color.DarkGray,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 12.dp)
-        ) {
-            if (tags.isEmpty()) {
-                Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Nenhuma etiqueta lida ainda", color = Color.Gray)
-                }
-            } else {
-                LazyColumn(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                ) {
-                    items(tags) { tag ->
-                        val status = statusTag(
-                            tag.epc,
-                            filtroLoja,
-                            filtroSetor,
-                            listaFiltrada,
-                            listaTotal
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = when (status) {
-                                    "verde" -> Icons.Filled.CheckCircle
-                                    "amarelo" -> Icons.Filled.Warning
-                                    "cinza" -> Icons.Filled.Info
-                                    else -> Icons.Filled.Error
-                                },
-                                contentDescription = "Status",
-                                tint = when (status) {
-                                    "verde" -> Color(0xFF2E7D32)
-                                    "amarelo" -> Color(0xFFFFC107)
-                                    "cinza" -> Color.Gray
-                                    else -> Color.Red
-                                },
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                tag.epc,
-                                fontSize = 16.sp,
-                                color = when (status) {
-                                    "verde" -> Color(0xFF2E7D32)
-                                    "amarelo" -> Color(0xFFFFA000)
-                                    "cinza" -> Color.Gray
-                                    else -> Color.Red
-                                },
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = status.replaceFirstChar { it.uppercase() },
-                                color = Color.DarkGray,
-                                fontSize = 14.sp
-                            )
+    RKTecMiddlewareTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Inventário") },
+                    navigationIcon = {
+                        IconButton(onClick = onVoltar) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
                         }
-                        Divider()
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
+                    .padding(bottom = Dimens.PaddingMedium),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+                Text(
+                    "Pressione o gatilho para ler",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                Text(
+                    "Lidos: ${tagsLidas.size} / Esperado: ${listaFiltrada.size}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+
+                Card(
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingExtraSmall),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = Dimens.PaddingMedium)
+                ) {
+                    if (tagsLidas.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Nenhuma etiqueta lida ainda", color = RktTextSecondary)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(Dimens.PaddingSmall),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
+                        ) {
+                            items(tagsLidas, key = { it.epc }) { tag ->
+                                val status = statusTag(tag.epc, filtroLoja, filtroSetor, listaFiltrada, listaTotal)
+
+                                if (status == StatusInventario.AMARELO && filtroSetor != null && tag.epc !in tagsCorrigidasNaSessao) {
+                                    LaunchedEffect(tag.epc) {
+                                        scope.launch(Dispatchers.IO) {
+                                            banco.inventarioDao().corrigirSetor(tag.epc, filtroSetor)
+                                            tagsCorrigidasNaSessao.add(tag.epc)
+                                        }
+                                    }
+                                }
+
+                                val itemFoiCorrigido = tag.epc in tagsCorrigidasNaSessao
+                                val statusFinal = if (itemFoiCorrigido) StatusInventario.CORRIGIDO else status
+
+                                TagLidaItem(epc = tag.epc, status = statusFinal)
+                                Divider(color = RktBackground)
+                            }
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+
+                PrimaryButton(
+                    onClick = {
+                        scope.launch {
+                            val arquivoLog = LogHelper.registrarSessaoDeInventario(
+                                context = context, usuario = usuarioLogado, loja = filtroLoja,
+                                setor = filtroSetor, itensEsperados = listaFiltrada,
+                                itensLidos = tagsLidas, itensTotaisDaBase = listaTotal
+                            )
+                            Toast.makeText(
+                                context,
+                                if (arquivoLog != null) "Sessão registrada no log: ${arquivoLog.name}"
+                                else "Falha ao registrar a sessão.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        onVoltar()
+                    },
+                    text = "Finalizar Sessão",
+                    modifier = Modifier.padding(horizontal = Dimens.PaddingMedium)
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-                CoroutineScope(Dispatchers.IO).launch {
-                    banco.coletaDao().inserirTodos(tags)
-                }
-                // Você pode chamar onVoltar() aqui se quiser fechar a tela
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 8.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
-        ) {
-            Text("Finalizar Inventário", fontSize = 20.sp, color = Color.White)
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
     }
 }
-/**
- * Determina o status visual de cada tag lida, conforme o filtro ativo e inventário completo
- */
-fun statusTag(
+
+@Composable
+private fun TagLidaItem(epc: String, status: StatusInventario) {
+    val statusColor = status.toColor()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Dimens.PaddingExtraSmall, horizontal = Dimens.PaddingSmall)
+    ) {
+        Icon(
+            imageVector = status.toIcon(),
+            contentDescription = "Status",
+            tint = statusColor,
+            modifier = Modifier.size(Dimens.IconSizeSmall)
+        )
+        Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
+        Text(
+            text = epc,
+            style = MaterialTheme.typography.bodyLarge,
+            color = statusColor,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = status.name.lowercase().replaceFirstChar { it.uppercase() },
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+
+private fun statusTag(
     epc: String,
     filtroLoja: String?,
     filtroSetor: String?,
     listaFiltrada: List<ItemInventario>,
     listaTotal: List<ItemInventario>
-): String {
-    // VERDE: Está no filtro (loja e setor selecionados)
-    if (listaFiltrada.any { it.tag == epc }) return "verde"
-
-    // AMARELO: Está na loja filtrada, mas em outro setor
-    if (filtroLoja != null && listaTotal.any { it.tag == epc && it.loja == filtroLoja }) return "amarelo"
-
-    // CINZA: Está em outra loja ou setor da planilha
-    if (listaTotal.any { it.tag == epc }) return "cinza"
-
-    // VERMELHO: Não está na planilha
-    return "vermelho"
+): StatusInventario {
+    if (listaFiltrada.any { it.tag == epc }) return StatusInventario.VERDE
+    if (filtroLoja != null && listaTotal.any { it.tag == epc && it.loja == filtroLoja }) return StatusInventario.AMARELO
+    if (listaTotal.any { it.tag == epc }) return StatusInventario.CINZA
+    return StatusInventario.VERMELHO
 }

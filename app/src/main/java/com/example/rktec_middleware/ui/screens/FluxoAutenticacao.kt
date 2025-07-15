@@ -1,17 +1,19 @@
+// ui/screens/FluxoAutenticacao.kt
 package com.example.rktec_middleware.ui.screens
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.viewmodel.CadastroViewModel
-import com.example.rktec_middleware.viewmodel.CadastroViewModelFactory
-import com.example.rktec_middleware.viewmodel.LoginViewModel
-import com.example.rktec_middleware.viewmodel.LoginViewModelFactory
-import com.example.rktec_middleware.viewmodel.RecuperarSenhaViewModel
+import com.example.rktec_middleware.viewmodel.*
 
-enum class TelaAutenticacao {
-    LOGIN, ESQUECI_SENHA, CADASTRO
+private object AuthRoutes {
+    const val LOGIN = "login"
+    const val CADASTRO = "cadastro"
+    const val ESQUECI_SENHA = "esqueci_senha"
 }
 
 @Composable
@@ -19,44 +21,39 @@ fun FluxoAutenticacao(
     usuarioRepository: UsuarioRepository,
     aoLoginSucesso: (Usuario) -> Unit
 ) {
-    // Os ViewModels agora recebem o repository corretamente!
+    val navController = rememberNavController()
     val loginViewModel: LoginViewModel = viewModel(factory = LoginViewModelFactory(usuarioRepository))
     val cadastroViewModel: CadastroViewModel = viewModel(factory = CadastroViewModelFactory(usuarioRepository))
-    val recuperarSenhaViewModel: RecuperarSenhaViewModel = viewModel() // se não usa repo, pode manter assim
+    val recuperarSenhaViewModel: RecuperarSenhaViewModel = viewModel()
 
-    var telaAtual by remember { mutableStateOf(TelaAutenticacao.LOGIN) }
-    var emailSalvo by remember { mutableStateOf("") }
-
-    // ---- RESET DE ESTADO DO LOGIN SEMPRE QUE VOLTAR PRA TELA DE LOGIN ----
-    LaunchedEffect(telaAtual) {
-        if (telaAtual == TelaAutenticacao.LOGIN) {
+    NavHost(navController = navController, startDestination = AuthRoutes.LOGIN) {
+        composable(AuthRoutes.LOGIN) {
             loginViewModel.resetarEstado()
+            TelaLogin(
+                viewModel = loginViewModel,
+                onLoginSucesso = aoLoginSucesso,
+                onIrParaCadastro = { navController.navigate(AuthRoutes.CADASTRO) },
+                onEsqueciSenha = { email ->
+                    recuperarSenhaViewModel.setEmail(email) // Agora esta função existe
+                    navController.navigate(AuthRoutes.ESQUECI_SENHA)
+                }
+            )
         }
-    }
-
-    when (telaAtual) {
-        TelaAutenticacao.LOGIN -> TelaLogin(
-            onLoginSucesso = { aoLoginSucesso(it) },
-            onEsqueciSenha = { email ->
-                emailSalvo = email
-                telaAtual = TelaAutenticacao.ESQUECI_SENHA
-            },
-            onIrParaCadastro = { telaAtual = TelaAutenticacao.CADASTRO },
-            viewModel = loginViewModel
-        )
-        TelaAutenticacao.CADASTRO -> TelaCadastro(
-            cadastroViewModel = cadastroViewModel,
-            aoCadastroSucesso = { telaAtual = TelaAutenticacao.LOGIN },
-            aoVoltarLogin = { telaAtual = TelaAutenticacao.LOGIN }
-        )
-
-        TelaAutenticacao.ESQUECI_SENHA -> TelaEsqueciSenha(
-            aoEnviarCodigo = { email ->
-                emailSalvo = email
-                recuperarSenhaViewModel.enviarResetEmail(email)
-                telaAtual = TelaAutenticacao.LOGIN
-            },
-            aoVoltarLogin = { telaAtual = TelaAutenticacao.LOGIN }
-        )
+        composable(AuthRoutes.CADASTRO) {
+            TelaCadastro(
+                cadastroViewModel = cadastroViewModel,
+                aoCadastroSucesso = { navController.navigate(AuthRoutes.LOGIN) { popUpTo(AuthRoutes.LOGIN) { inclusive = true } } },
+                aoVoltarLogin = { navController.popBackStack() }
+            )
+        }
+        composable(AuthRoutes.ESQUECI_SENHA) {
+            TelaEsqueciSenha(
+                aoEnviarCodigo = { email ->
+                    recuperarSenhaViewModel.enviarResetEmail(email)
+                    navController.popBackStack()
+                },
+                aoVoltarLogin = { navController.popBackStack() }
+            )
+        }
     }
 }

@@ -1,53 +1,57 @@
+// ui/theme/Theme.kt
 package com.example.rktec_middleware.ui.theme
 
-import android.os.Build
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.White
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
+// PALETA DE CORES CLARAS USANDO NOSSAS CORES
 private val LightColorScheme = lightColorScheme(
-    primary = AzulRKTEC,
-    onPrimary = White,
-    primaryContainer = AzulContainer,
-    onPrimaryContainer = DarkText,
-    background = White,
-    surface = White,
-    onBackground = DarkText,
-    onSurface = DarkText,
-    outline = Color(0xFFB0BEC5)
+    primary = RktBluePrimary,
+    onPrimary = Color.White,
+    primaryContainer = RktBlueDark,
+    onPrimaryContainer = Color.White,
+    secondary = RktBlueInfo,
+    onSecondary = Color.White,
+    tertiary = RktGreen,
+    onTertiary = Color.White,
+    error = RktRed,
+    onError = Color.White,
+    background = RktBackground,
+    onBackground = RktTextPrimary,
+    surface = RktSurface,
+    onSurface = RktTextPrimary,
+    surfaceVariant = RktBlueLight,
+    onSurfaceVariant = RktTextSecondary
 )
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AzulRKTEC,
-    onPrimary = White,
-    background = Color(0xFF121212),
-    surface = Color(0xFF1E1E1E),
-    onBackground = White,
-    onSurface = White
-)
 @Composable
-fun RKTECmiddlewareTheme(content: @Composable () -> Unit) {
-    val colorScheme = lightColorScheme(
-        primary = Color(0xFF0077B5),
-        onPrimary = Color.White,
-        primaryContainer = Color(0xFF5599CC),
-        onPrimaryContainer = Color.White,
-        background = Color.White, // <- FUNDO CLARO
-        onBackground = Color.Black,
-        surface = Color.White,     // <- CARDS CLAROS
-        onSurface = Color.Black,
-        surfaceVariant = Color(0xFFF2F2F2),
-        onSurfaceVariant = Color.DarkGray,
-        outline = Color(0xFFCCCCCC),
-    )
+fun RKTecMiddlewareTheme( // Renomeado para consistência
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val colorScheme = LightColorScheme // Usando nossa paleta
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = colorScheme.primaryContainer.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+        }
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography(),
-        shapes = Shapes(), // ou defina shapes custom se necessário
+        typography = AppTypography,
+        shapes = AppShapes,
         content = content
     )
 }

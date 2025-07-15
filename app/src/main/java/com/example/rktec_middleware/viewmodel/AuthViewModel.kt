@@ -24,12 +24,6 @@ class AuthViewModel(
     private val _mapeamentoConcluido = MutableStateFlow(false)
     val mapeamentoConcluido: StateFlow<Boolean> = _mapeamentoConcluido
 
-    fun login(context: Context, usuario: Usuario) {
-        Log.d("RKTEC_DEBUG", "CHAMOU AuthViewModel.login com ${usuario.email}")
-        _usuarioAutenticado.value = usuario
-        UsuarioLogadoManager.salvarUsuario(context, usuario.email)
-    }
-
     fun recarregarUsuario(email: String) {
         viewModelScope.launch {
             val usuario = usuarioRepository.buscarPorEmail(email)
@@ -39,31 +33,49 @@ class AuthViewModel(
         }
     }
 
-    fun logout(context: Context) {
-        UsuarioLogadoManager.limparUsuario(context)
-        _usuarioAutenticado.value = null
-        _mapeamentoConcluido.value = false
-        FirebaseAuth.getInstance().signOut()
-    }
-
     fun setMapeamentoConcluido(concluido: Boolean) {
         _mapeamentoConcluido.value = concluido
     }
 
-    fun autoLogin(context: Context, onMapeamento: suspend () -> Boolean) {
-        if (autoLoginJaRodou) return
-        autoLoginJaRodou = true
+    fun login(context: Context, usuario: Usuario) {
         viewModelScope.launch {
-            val emailSalvo = UsuarioLogadoManager.obterUsuario(context)
-            if (!emailSalvo.isNullOrBlank()) {
-                val usuario = usuarioRepository.buscarPorEmail(emailSalvo)
+            _usuarioAutenticado.value = usuario
+
+            // Salvando o login no SharedPreferences
+            val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("usuario_email", usuario.email).apply()
+
+            // (Opcional) também marca mapeamento como feito
+            setMapeamentoConcluido(true)
+        }
+    }
+
+    fun autoLogin(context: Context, isMapeamentoOk: suspend () -> Boolean) {
+        viewModelScope.launch {
+            val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+            val email = prefs.getString("usuario_email", null)
+
+            if (email != null) {
+                val usuario = usuarioRepository.buscarPorEmail(email)
                 if (usuario != null) {
                     _usuarioAutenticado.value = usuario
-                    val mapeamento = onMapeamento()
-                    _mapeamentoConcluido.value = mapeamento
+                    setMapeamentoConcluido(isMapeamentoOk())
                 }
             }
         }
     }
+
+    fun logout(context: Context) {
+        viewModelScope.launch {
+            _usuarioAutenticado.value = null
+            context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply()
+            setMapeamentoConcluido(false)
+        }
+    }
+
+
 
 }

@@ -1,345 +1,226 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.rktec_middleware.ui.screens
 
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.EpcTag
+import com.example.rktec_middleware.data.model.*
+import com.example.rktec_middleware.ui.components.InfoChip
+import com.example.rktec_middleware.ui.components.StandardTextField
+import com.example.rktec_middleware.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaDebug(
     banco: AppDatabase,
+    usuarioLogado: String,
     refresh: Int,
     onVoltar: () -> Unit,
     onBancoLimpo: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var epcs by remember { mutableStateOf<List<EpcTag>>(emptyList()) }
+    var inventarioCompleto by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
     var mostrarDialogLimparBanco by remember { mutableStateOf(false) }
-
-    // Para edição:
-    var tagEditando by remember { mutableStateOf<EpcTag?>(null) }
-    var campoDesc by remember { mutableStateOf("") }
-    var campoSetor by remember { mutableStateOf("") }
-    var campoLoja by remember { mutableStateOf("") }
+    var textoBusca by remember { mutableStateOf("") }
+    var itemEditando by remember { mutableStateOf<ItemInventario?>(null) }
+    val context = LocalContext.current
 
     LaunchedEffect(refresh) {
-        scope.launch {
-            epcs = banco.coletaDao().listarTodas()
+        inventarioCompleto = withContext(Dispatchers.IO) {
+            banco.inventarioDao().listarTodos()
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F7FA))
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color(0xFF174D86),
-                        1f to Color(0xFF4A90E2)
+    val inventarioFiltrado by remember(textoBusca, inventarioCompleto) {
+        derivedStateOf {
+            if (textoBusca.isBlank()) inventarioCompleto
+            else inventarioCompleto.filter {
+                it.tag.contains(textoBusca, true) || it.desc.contains(textoBusca, true) ||
+                        it.localizacao.contains(textoBusca, true) || it.loja.contains(textoBusca, true)
+            }
+        }
+    }
+
+    RKTecMiddlewareTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Consulta e Edição") },
+                    navigationIcon = { IconButton(onClick = onVoltar) { Icon(Icons.Default.ArrowBack, "Voltar") } },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 )
-                .shadow(3.dp)
-        ) {
-            IconButton(
-                onClick = onVoltar,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 8.dp)
-                    .size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "Voltar",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
             }
-            Text(
-                "DEBUG",
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // CARD CENTRAL de estatística e lista
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 7.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .weight(1f)
-        ) {
+        ) { paddingValues ->
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp)
+                modifier = Modifier.padding(paddingValues).fillMaxSize().background(MaterialTheme.colorScheme.background)
+                    .padding(Dimens.PaddingMedium),
+                verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
             ) {
-                Text(
-                    "Total de tags: ${epcs.size}",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF174D86)
+                StandardTextField(
+                    value = textoBusca,
+                    onValueChange = { textoBusca = it },
+                    label = "Buscar por EPC, nome, loja ou setor",
+                    leadingIcon = { Icon(Icons.Default.Search, "Buscar") }
                 )
-                Spacer(modifier = Modifier.height(12.dp))
 
-                if (epcs.isEmpty()) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(30.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Nenhuma tag salva ainda.", color = Color(0xFFB0BEC5), fontSize = 15.sp)
-                    }
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxHeight()
-                    ) {
-                        items(epcs) { tag ->
-                            Card(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp, horizontal = 2.dp)
-                                    .clickable {
-                                        tagEditando = tag
-                                        campoDesc = tag.descricao
-                                        campoSetor = tag.setor
-                                        campoLoja = tag.loja ?: ""
-                                    },
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = "${tag.epc}",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF222222),
-                                        maxLines = 1
-                                    )
-                                    Text(
-                                        text = formatarData(tag.timestamp),
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF6C757D)
-                                    )
-                                    if (tag.descricao.isNotBlank()) {
-                                        Text(
-                                            text = tag.descricao,
-                                            fontSize = 13.sp,
-                                            color = Color(0xFF4A90E2),
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 2
-                                        )
-                                    }
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.padding(top = 3.dp, bottom = 2.dp)
-                                    ) {
-                                        if (tag.setor.isNotBlank()) {
-                                            InfoChipDebug("Setor: ${tag.setor}", Color(0xFFE1F5FE), Color(0xFF0277BD))
-                                        }
-                                        if (tag.loja?.isNotBlank() == true) {
-                                            InfoChipDebug("Loja: ${tag.loja}", Color(0xFFD1F5D5), Color(0xFF2E7D32))
-                                        }
-                                    }
+                Card(
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                ) {
+                    Column(Modifier.padding(Dimens.PaddingMedium)) {
+                        Text(
+                            "Total de itens: ${inventarioFiltrado.size} / ${inventarioCompleto.size}",
+                            style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        )
+                        Spacer(Modifier.height(Dimens.PaddingSmall))
+                        if (inventarioCompleto.isEmpty()) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Nenhum item de inventário importado.", color = RktTextSecondary)
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                                items(inventarioFiltrado, key = { it.tag }) { item ->
+                                    ItemDebugCard(item) { itemEditando = item }
                                 }
                             }
                         }
                     }
                 }
+                Button(
+                    onClick = { mostrarDialogLimparBanco = true },
+                    modifier = Modifier.fillMaxWidth().height(Dimens.ComponentHeight),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Limpar Banco de Dados", style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Botão Limpar Banco
-        Button(
-            onClick = { mostrarDialogLimparBanco = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp)
-                .height(54.dp),
-            shape = RoundedCornerShape(22.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-            elevation = ButtonDefaults.buttonElevation(7.dp)
-        ) {
-            Text(
-                "Limpar Banco",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Dialog de edição de item
-        if (tagEditando != null) {
-            AlertDialog(
-                onDismissRequest = { tagEditando = null },
-                title = { Text("Editar Tag", fontWeight = FontWeight.Bold) },
-                text = {
-                    Column {
-                        OutlinedTextField(
-                            value = campoDesc,
-                            onValueChange = { campoDesc = it },
-                            label = { Text("Descrição") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = campoSetor,
-                            onValueChange = { campoSetor = it },
-                            label = { Text("Setor") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = campoLoja,
-                            onValueChange = { campoLoja = it },
-                            label = { Text("Loja") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(onClick = {
-                        scope.launch {
-                            tagEditando?.let {
-                                val atualizado = it.copy(
-                                    descricao = campoDesc,
-                                    setor = campoSetor,
-                                    loja = campoLoja
-                                )
-                                banco.coletaDao().atualizarTag(atualizado)
-                                epcs = banco.coletaDao().listarTodas()
-                                tagEditando = null
-                            }
+        if (itemEditando != null) {
+            DialogEditarItemDebug(
+                item = itemEditando!!,
+                onDismiss = { itemEditando = null },
+                onConfirm = { itemAtualizado ->
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            banco.inventarioDao().atualizarItem(itemAtualizado)
                         }
-                    }) {
-                        Text("Salvar")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(
-                        onClick = { tagEditando = null },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFFD32F2F)
-                        ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp, brush = Brush.horizontalGradient(listOf(Color(0xFFD32F2F), Color(0xFF4A90E2))))
-                    ) {
-                        Text("Cancelar", fontWeight = FontWeight.Bold)
+                        val index = inventarioCompleto.indexOfFirst { it.tag == itemAtualizado.tag }
+                        if (index != -1) {
+                            val novaLista = inventarioCompleto.toMutableList()
+                            novaLista[index] = itemAtualizado
+                            inventarioCompleto = novaLista
+                        }
+                        Toast.makeText(context, "Item atualizado!", Toast.LENGTH_SHORT).show()
+                        itemEditando = null
                     }
                 }
             )
         }
 
-        // Dialog de confirmação
         if (mostrarDialogLimparBanco) {
             AlertDialog(
                 onDismissRequest = { mostrarDialogLimparBanco = false },
-                title = {
-                    Text(
-                        "⚠️ Atenção: Limpar TODOS os dados!",
-                        color = Color(0xFFD32F2F),
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                },
-                text = {
-                    Text(
-                        "Isso vai apagar o inventário, as tags coletadas e o mapeamento de colunas!\n\nEssa ação NÃO pode ser desfeita.",
-                        color = Color(0xFF424242),
-                        fontWeight = FontWeight.Medium
-                    )
-                },
+                icon = { Icon(Icons.Default.Warning, "Atenção", tint = RktRed) },
+                title = { Text("Limpar TODOS os dados?") },
+                text = { Text("Isso vai apagar todo o inventário, coletas, logs e mapeamentos. A ação não pode ser desfeita.") },
                 confirmButton = {
                     Button(
                         onClick = {
                             mostrarDialogLimparBanco = false
                             scope.launch {
-                                banco.inventarioDao().limparInventario()
-                                banco.coletaDao().limparColetas()
-                                banco.mapeamentoDao().deletarTudo()
-                                epcs = emptyList()
+                                // CORREÇÃO APLICADA AQUI
+                                withContext(Dispatchers.IO) {
+                                    banco.clearAllTables() // Executando em segundo plano
+                                }
                                 onBancoLimpo()
+                                Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text("APAGAR TUDO", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                        colors = ButtonDefaults.buttonColors(containerColor = RktRed)
+                    ) { Text("APAGAR TUDO") }
                 },
-                dismissButton = {
-                    OutlinedButton(
-                        onClick = { mostrarDialogLimparBanco = false },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFFD32F2F)
-                        ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.5.dp, brush = Brush.horizontalGradient(listOf(Color(0xFFD32F2F), Color(0xFF4A90E2))))
-                    ) {
-                        Text("Cancelar", fontWeight = FontWeight.Bold)
-                    }
-                }
+                dismissButton = { OutlinedButton(onClick = { mostrarDialogLimparBanco = false }) { Text("Cancelar") } }
             )
         }
     }
 }
-
 @Composable
-fun InfoChipDebug(text: String, bgColor: Color, fgColor: Color) {
-    Box(
-        modifier = Modifier
-            .background(bgColor, shape = RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+private fun ItemDebugCard(item: ItemInventario, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Text(
-            text = text,
-            color = fgColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium
-        )
+        Column(Modifier.padding(Dimens.PaddingMedium)) {
+            Text(text = item.desc.ifBlank { "Item sem descrição" }, style = MaterialTheme.typography.titleLarge)
+            Text(text = item.tag, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(Dimens.PaddingSmall))
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                if (item.loja.isNotBlank()) InfoChip("Loja: ${item.loja}")
+                if (item.localizacao.isNotBlank()) InfoChip("Setor: ${item.localizacao}")
+            }
+            AnimatedVisibility(item.colunasExtras.isNotEmpty()) {
+                Column {
+                    Divider(modifier = Modifier.padding(vertical = Dimens.PaddingSmall))
+                    Text("Dados adicionais:", style = MaterialTheme.typography.labelMedium, color = RktTextSecondary)
+                    item.colunasExtras.forEach { (chave, valor) ->
+                        Text("• $chave: $valor", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
     }
 }
 
-fun formatarData(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+
+@Composable
+private fun DialogEditarItemDebug(item: ItemInventario, onConfirm: (ItemInventario) -> Unit, onDismiss: () -> Unit) {
+    var desc by remember { mutableStateOf(item.desc) }
+    var setor by remember { mutableStateOf(item.localizacao) }
+    var loja by remember { mutableStateOf(item.loja) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Item") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                Text("EPC: ${item.tag}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                StandardTextField(value = desc, onValueChange = { desc = it }, label = "Nome/Descrição")
+                StandardTextField(value = setor, onValueChange = { setor = it }, label = "Setor")
+                StandardTextField(value = loja, onValueChange = { loja = it }, label = "Loja")
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onConfirm(item.copy(desc = desc, localizacao = setor, loja = loja))
+            }) { Text("Salvar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
 }
-
-

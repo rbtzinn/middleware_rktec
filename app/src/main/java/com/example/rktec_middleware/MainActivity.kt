@@ -1,22 +1,27 @@
 package com.example.rktec_middleware
 
 import android.os.Bundle
-import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
-import com.example.rktec_middleware.data.model.LogMapeamento
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.screens.*
-import com.example.rktec_middleware.ui.theme.RKTECmiddlewareTheme
-import com.example.rktec_middleware.util.UsuarioLogadoManager
+import com.example.rktec_middleware.ui.theme.RKTecMiddlewareTheme
 import com.example.rktec_middleware.viewmodel.AuthViewModel
 import com.example.rktec_middleware.viewmodel.AuthViewModelFactory
 import com.example.rktec_middleware.viewmodel.RfidViewModel
@@ -29,191 +34,163 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewModel = ViewModelProvider(
-            this,
-            RfidViewModelFactory(applicationContext)
-        ).get(RfidViewModel::class.java)
+        viewModel = ViewModelProvider(this, RfidViewModelFactory(applicationContext)).get(RfidViewModel::class.java)
 
         val appDatabase = AppDatabase.getInstance(applicationContext)
         val usuarioRepository = UsuarioRepository(appDatabase.usuarioDao())
 
         setContent {
-            RKTECmiddlewareTheme {
-                val context = LocalContext.current
+            RKTecMiddlewareTheme {
+                val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
+                val context = LocalContext.current
 
-                val authViewModel: AuthViewModel = viewModel(
-                    factory = AuthViewModelFactory(usuarioRepository)
-                )
+                val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(usuarioRepository))
                 val usuarioAutenticado by authViewModel.usuarioAutenticado.collectAsState()
-                val mapeamentoConcluido by authViewModel.mapeamentoConcluido.collectAsState()
 
-                // 🔥 NOVO: Agora telaAtual só muda por este bloco! 🔥
-                var telaAtual by remember { mutableStateOf("login") }
-                var refreshDebug by remember { mutableStateOf(0) }
                 var filtroLoja by remember { mutableStateOf<String?>(null) }
                 var filtroSetor by remember { mutableStateOf<String?>(null) }
                 var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
                 var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-                val usuarioDao = AppDatabase.getInstance(context).usuarioDao()
+                var refreshDebug by remember { mutableStateOf(0) }
 
-                // --------- AUTOLOGIN (SÓ UMA VEZ) ---------
+                var isLoading by remember { mutableStateOf(true) }
+                var startDestination by remember { mutableStateOf<String?>(null) }
+
                 LaunchedEffect(Unit) {
-                    Log.d("RKTEC", "INICIANDO AUTOLOGIN")
                     authViewModel.autoLogin(context) {
                         appDatabase.mapeamentoDao().buscarPrimeiro() != null
                     }
-                }
-                // 🔥 NOVO: O ÚNICO responsável por trocar entre login/menu 🔥
-                LaunchedEffect(usuarioAutenticado) {
-                    if (usuarioAutenticado == null) {
-                        telaAtual = "login"
-                    } else if (telaAtual == "login") {
-                        telaAtual = "menu"
+                    val user = authViewModel.usuarioAutenticado.value
+                    val mapeamentoConcluido = authViewModel.mapeamentoConcluido.value
+
+                    startDestination = if (user == null) {
+                        Screen.Autenticacao.route
+                    } else if (!mapeamentoConcluido) {
+                        Screen.Importacao.route
+                    } else {
+                        Screen.Principal.route
                     }
+                    isLoading = false
                 }
 
-                // ----------- FLUXO DE TELAS -----------
-                when (telaAtual) {
-                    "login" -> {
-                        FluxoAutenticacao(
-                            usuarioRepository = usuarioRepository,
-                            aoLoginSucesso = { usuarioNovo ->
-                                if (authViewModel.usuarioAutenticado.value?.email != usuarioNovo.email) {
-                                    Log.d(
-                                        "RKTEC_DEBUG",
-                                        "CHAMOU onLoginSucesso com ${usuarioNovo.email}"
-                                    )
-                                    authViewModel.login(context, usuarioNovo)
-                                    scope.launch {
-                                        val mapeamento =
-                                            appDatabase.mapeamentoDao().buscarPrimeiro()
-                                        authViewModel.setMapeamentoConcluido(mapeamento != null)
-                                    }
-                                    // NÃO seta telaAtual aqui — controle é do LaunchedEffect!
-                                } else {
-                                    Log.d(
-                                        "RKTEC_DEBUG",
-                                        "Ignorou login duplicado de ${usuarioNovo.email}"
-                                    )
-                                }
-                            }
-                        )
+                if (isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                    // Mapeamento
-                    "menu" -> {
-                        if (!mapeamentoConcluido) {
-                            TelaImportacao(
-                                onConcluido = { nomeArquivo ->
+                } else {
+                    NavHost(navController = navController, startDestination = startDestination!!) {
+
+                        composable(Screen.Autenticacao.route) {
+                            FluxoAutenticacao(
+                                usuarioRepository = usuarioRepository,
+                                aoLoginSucesso = { usuario ->
+                                    authViewModel.login(context, usuario)
                                     scope.launch {
-                                        val usuario =
-                                            usuarioAutenticado?.nome ?: usuarioAutenticado?.email
-                                            ?: ""
-                                        val dataHora = java.time.LocalDateTime.now()
-                                            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                                        val log = LogMapeamento(
-                                            usuario = usuario,
-                                            dataHora = dataHora,
-                                            arquivo = nomeArquivo
-                                        )
-                                        appDatabase.logMapeamentoDao().inserir(log)
-                                        authViewModel.setMapeamentoConcluido(true)
-                                        refreshDebug++
-                                        telaAtual = "menu"
+                                        val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro() != null
+                                        val proximaTela = if (mapeamento) Screen.Principal.route else Screen.Importacao.route
+                                        navController.navigate(proximaTela) { popUpTo(Screen.Autenticacao.route) { inclusive = true } }
                                     }
-                                },
-                                appDatabase = appDatabase,
-                                usuario = usuarioAutenticado?.nome ?: usuarioAutenticado?.email
-                                ?: "",
-                                onDebugClick = { telaAtual = "debug" },
-                                onSobreClick = { telaAtual = "sobre" }
+                                }
                             )
-                        } else {
-                            // Tela principal do app
+                        }
+
+                        composable(Screen.Importacao.route) {
+                            TelaImportacao(
+                                onConcluido = {
+                                    authViewModel.setMapeamentoConcluido(true)
+                                    refreshDebug++
+                                    navController.navigate(Screen.Principal.route) { popUpTo(Screen.Importacao.route) { inclusive = true } }
+                                },
+                                usuario = usuarioAutenticado?.nome ?: "",
+                                onSobreClick = { navController.navigate(Screen.Sobre.route) }
+                            )
+                        }
+
+                        composable(Screen.Principal.route) {
                             TelaPrincipal(
-                                usuarioDao = usuarioDao,
+                                usuarioDao = appDatabase.usuarioDao(),
                                 authViewModel = authViewModel,
-                                onColetaClick = { telaAtual = "leitura" },
-                                onInventarioClick = { telaAtual = "inventario" },
-                                onDebugClick = { telaAtual = "debug" },
-                                onSobreClick = { telaAtual = "sobre" },
+                                usuarioRepository = usuarioRepository,
+                                onInventarioClick = { navController.navigate(Screen.Inventario.route) },
+                                onDebugClick = { navController.navigate(Screen.Debug.route) },
+                                onSobreClick = { navController.navigate(Screen.Sobre.route) },
+                                onGerenciarUsuariosClick = { navController.navigate(Screen.GerenciamentoUsuarios.route) },
                                 onSairClick = {
                                     scope.launch {
                                         authViewModel.logout(context)
-                                        // Aguarda um frame pra garantir limpeza antes de recompor
-                                        kotlinx.coroutines.delay(150)
-                                        // telaAtual vai pra login pelo LaunchedEffect
+                                        navController.navigate(Screen.Autenticacao.route) { popUpTo(Screen.Principal.route) { inclusive = true } }
                                     }
-                                },
-                                onGerenciarUsuariosClick = { telaAtual = "usuarios" }
+                                }
                             )
                         }
-                    }
 
-                    "leitura" -> TelaLeituraColeta(
-                        viewModel = viewModel,
-                        onVoltar = { telaAtual = "menu" }
-                    )
-
-                    "inventario" -> TelaInventario(
-                        onVoltar = { telaAtual = "menu" },
-                        onIniciarLeituraInventario = { loja, setor, total, filtrada ->
-                            filtroLoja = loja
-                            filtroSetor = setor
-                            listaTotal = total
-                            listaFiltrada = filtrada
-                            telaAtual = "leituraInventario"
-                        },
-                        onDebugClick = { telaAtual = "debug" },
-                        onSobreClick = { telaAtual = "sobre" }
-                    )
-
-                    "leituraInventario" -> TelaLeituraInventario(
-                        onVoltar = { telaAtual = "menu" },
-                        banco = appDatabase,
-                        listaFiltrada = listaFiltrada,
-                        listaTotal = listaTotal,
-                        filtroLoja = filtroLoja,
-                        filtroSetor = filtroSetor
-                    )
-
-                    "debug" -> TelaDebug(
-                        banco = appDatabase,
-                        refresh = refreshDebug,
-                        onVoltar = { telaAtual = "menu" },
-                        onBancoLimpo = {
-                            authViewModel.setMapeamentoConcluido(false)
-                            telaAtual = "menu"
+                        composable(Screen.Inventario.route) {
+                            TelaInventario(
+                                onVoltar = { navController.popBackStack() },
+                                onIniciarLeituraInventario = { loja, setor, total, filtrada ->
+                                    filtroLoja = loja
+                                    filtroSetor = setor
+                                    listaTotal = total
+                                    listaFiltrada = filtrada
+                                    navController.navigate(Screen.LeituraInventario.route)
+                                },
+                                onSobreClick = { navController.navigate(Screen.Sobre.route) }
+                            )
                         }
-                    )
 
-                    "sobre" -> TelaSobre(
-                        onVoltar = { telaAtual = "menu" }
-                    )
-
-                    "usuarios" -> {
-                        var usuarios by remember { mutableStateOf<List<Usuario>>(emptyList()) }
-                        val refreshUsuarios: () -> Unit = {
-                            scope.launch { usuarios = usuarioRepository.listarTodos() }
+                        composable(Screen.LeituraInventario.route) {
+                            TelaLeituraInventario(
+                                onVoltar = { navController.popBackStack() },
+                                banco = appDatabase,
+                                usuarioLogado = usuarioAutenticado?.nome ?: "Desconhecido",
+                                listaFiltrada = listaFiltrada,
+                                listaTotal = listaTotal,
+                                filtroLoja = filtroLoja,
+                                filtroSetor = filtroSetor
+                            )
                         }
-                        LaunchedEffect(telaAtual) {
-                            if (telaAtual == "usuarios") {
+
+                        composable(Screen.Debug.route) {
+                            TelaDebug(
+                                banco = appDatabase,
+                                refresh = refreshDebug,
+                                usuarioLogado = usuarioAutenticado?.nome ?: "Desconhecido",
+                                onVoltar = { navController.popBackStack() },
+                                onBancoLimpo = {
+                                    authViewModel.setMapeamentoConcluido(false)
+                                    navController.navigate(Screen.Importacao.route) { popUpTo(Screen.Principal.route) { inclusive = true } }
+                                }
+                            )
+                        }
+
+                        // ROTA QUE FALTAVA ADICIONADA AQUI
+                        composable(Screen.Sobre.route) {
+                            TelaSobre(onVoltar = { navController.popBackStack() })
+                        }
+
+                        composable(Screen.GerenciamentoUsuarios.route) {
+                            var usuarios by remember { mutableStateOf<List<Usuario>>(emptyList()) }
+                            LaunchedEffect(Unit) {
                                 usuarios = usuarioRepository.listarTodos()
                             }
+                            val usuariosUnicos = remember(usuarios) {
+                                usuarios.distinctBy { it.email }
+                            }
+                            TelaGerenciamentoUsuarios(
+                                usuarios = usuariosUnicos,
+                                usuarioRepository = usuarioRepository,
+                                usuarioLogadoEmail = usuarioAutenticado?.email ?: "",
+                                context = context,
+                                onAtualizarLista = { usuarioEditadoEmail ->
+                                    scope.launch { usuarios = usuarioRepository.listarTodos() }
+                                    if (usuarioEditadoEmail == usuarioAutenticado?.email) {
+                                        authViewModel.recarregarUsuario(usuarioEditadoEmail)
+                                    }
+                                },
+                                onVoltar = { navController.popBackStack() }
+                            )
                         }
-                        TelaGerenciamentoUsuarios(
-                            usuarios = usuarios,
-                            usuarioRepository = usuarioRepository,
-                            usuarioLogadoEmail = usuarioAutenticado?.email ?: "",
-                            context = context,
-                            onAtualizarLista = { usuarioEditadoEmail ->
-                                refreshUsuarios()
-                                if (usuarioEditadoEmail == usuarioAutenticado?.email) {
-                                    authViewModel.recarregarUsuario(usuarioEditadoEmail)
-                                }
-                            },
-                            onVoltar = { telaAtual = "menu" }
-                        )
                     }
                 }
             }

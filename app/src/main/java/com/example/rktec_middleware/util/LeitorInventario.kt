@@ -3,82 +3,106 @@ package com.example.rktec_middleware.util
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.example.rktec_middleware.data.model.ItemInventario
-import com.example.rktec_middleware.data.model.MapeamentoPlanilha
+import org.apache.poi.ss.usermodel.Cell
+import org.apache.poi.ss.usermodel.CellType
+import org.apache.poi.ss.usermodel.DateUtil
 import org.apache.poi.ss.usermodel.WorkbookFactory
 import java.io.BufferedReader
+import java.io.InputStream
 import java.io.InputStreamReader
-import java.text.Normalizer
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 object LeitorInventario {
-    fun normalizaCampo(campo: String): String {
-        return Normalizer.normalize(campo, Normalizer.Form.NFD)
-            .replace("[\\p{InCombiningDiacriticalMarks}]".toRegex(), "")
-            .replace("[^a-zA-Z0-9]".toRegex(), "")
-            .lowercase()
+
+    private fun getMimeType(context: Context, uri: Uri): String? {
+        return context.contentResolver.getType(uri)
     }
 
-    fun lerCsv(context: Context, uri: Uri, mapeamento: MapeamentoPlanilha): List<ItemInventario> {
-        val resultado = mutableListOf<ItemInventario>()
-        val inputStream = context.contentResolver.openInputStream(uri) ?: return emptyList()
+    private fun getCellValueAsString(cell: Cell?): String {
+        if (cell == null) return ""
+        return when (cell.cellType) {
+            CellType.STRING -> cell.stringCellValue.trim()
+            CellType.NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(cell.dateCellValue)
+                } else {
+                    val num = cell.numericCellValue
+                    if (num == num.toLong().toDouble()) num.toLong().toString() else num.toString()
+                }
+            }
+            CellType.BOOLEAN -> cell.booleanCellValue.toString()
+            CellType.FORMULA -> try { cell.stringCellValue } catch (e: Exception) { "" }
+            else -> ""
+        }
+    }
+
+    fun lerDadosBrutosDaPlanilha(context: Context, uri: Uri): Pair<List<String>, List<List<String>>>? {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+            val mimeType = getMimeType(context, uri)
+
+            return when {
+                // Rota para CSV
+                mimeType?.contains("csv") == true || mimeType?.contains("comma-separated-values") == true -> lerCsv(inputStream)
+                // Rota para Excel
+                mimeType?.contains("spreadsheet") == true || mimeType?.contains("excel") == true -> lerExcel(inputStream)
+                else -> {
+                    // Fallback para arquivos sem MimeType (tentativa pela extensão)
+                    val filename = uri.lastPathSegment?.lowercase()
+                    if (filename?.endsWith(".csv") == true) lerCsv(inputStream)
+                    else if (filename?.endsWith(".xls") == true || filename?.endsWith(".xlsx") == true) lerExcel(inputStream)
+                    else null
+                }
+            }.also {
+                inputStream.close()
+            }
+        } catch (e: Exception) {
+            Log.e("LeitorInventario", "Erro ao ler dados brutos", e)
+            return null
+        }
+    }
+
+    // MODIFICADO: Esta função agora lê o arquivo linha por linha, sendo mais eficiente para arquivos grandes.
+    private fun lerCsv(inputStream: InputStream): Pair<List<String>, List<List<String>>> {
         val reader = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
 
-        val linhas = reader.readLines().filter { it.isNotBlank() }
-        if (linhas.isEmpty()) return emptyList()
+        // Lê apenas a primeira linha para o cabeçalho
+        val cabecalhoLine = reader.readLine()
+        if (cabecalhoLine.isNullOrEmpty()) {
+            reader.close()
+            return Pair(emptyList(), emptyList())
+        }
 
-        val delimitadores = listOf(";", ",", "\t", "|")
-        val delimitador = delimitadores.maxByOrNull { linhas[0].count { ch -> ch == it[0] } } ?: ","
+        // Detecta o delimitador com base no cabeçalho
+        val delimitador = listOf(";", ",", "\t").maxByOrNull { cabecalhoLine.count { c -> c == it[0] } } ?: ","
+        val cabecalho = cabecalhoLine.split(delimitador).map { it.trim().removeSurrounding("\"") }
 
-        val cabecalhoBruto = linhas[0]
-            .replace("\"", "")
-            .replace("\uFEFF", "")
-            .split(delimitador)
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-
-        for (linha in linhas.drop(1)) {
-            if (linha.isBlank()) continue
-            val colunas = linha.replace("\"", "").split(delimitador).map { it.trim() }
-            if (colunas.size <= mapeamento.colunaEpc) continue
-
-            val tag = colunas.getOrNull(mapeamento.colunaEpc) ?: ""
-            val desc = mapeamento.colunaNome?.let { colunas.getOrNull(it) } ?: ""
-            val setor = mapeamento.colunaSetor?.let { colunas.getOrNull(it) } ?: ""
-            val loja = mapeamento.colunaLoja?.let { colunas.getOrNull(it) } ?: ""
-            if (tag.isNotBlank()) {
-                resultado.add(ItemInventario(tag, desc, setor, loja))
+        val dados = mutableListOf<List<String>>()
+        // Lê o restante do arquivo linha por linha
+        reader.forEachLine { linha ->
+            if (linha.isNotBlank()) {
+                val valores = linha.split(delimitador).map { it.trim().removeSurrounding("\"") }
+                dados.add(valores)
             }
         }
-        return resultado
+
+        reader.close()
+        return Pair(cabecalho, dados)
     }
 
-    fun lerExcel(context: Context, uri: Uri, mapeamento: MapeamentoPlanilha): List<ItemInventario> {
-        val lista = mutableListOf<ItemInventario>()
-        try {
-            val inputStream = context.contentResolver.openInputStream(uri) ?: return emptyList()
-            val workbook = WorkbookFactory.create(inputStream)
-            val sheet = workbook.getSheetAt(0)
+    private fun lerExcel(inputStream: InputStream): Pair<List<String>, List<List<String>>> {
+        val workbook = WorkbookFactory.create(inputStream)
+        val sheet = workbook.getSheetAt(0)
 
-            for (i in 1..sheet.lastRowNum) {
-                val row = sheet.getRow(i) ?: continue
-                val tag = row.getCell(mapeamento.colunaEpc)?.toString()?.trim() ?: ""
-                val desc = mapeamento.colunaNome?.let { row.getCell(it)?.toString()?.trim() ?: "" } ?: ""
-                val setor = mapeamento.colunaSetor?.let { row.getCell(it)?.toString()?.trim() ?: "" } ?: ""
-                val loja = mapeamento.colunaLoja?.let { row.getCell(it)?.toString()?.trim() ?: "" } ?: ""
-                if (tag.isNotBlank()) {
-                    lista.add(ItemInventario(tag, desc, setor, loja))
-                }
-
+        val cabecalho = sheet.getRow(0)?.map { getCellValueAsString(it) } ?: emptyList()
+        val dados = (1..sheet.lastRowNum).map { i ->
+            val row = sheet.getRow(i)
+            cabecalho.indices.map { j ->
+                getCellValueAsString(row?.getCell(j, org.apache.poi.ss.usermodel.Row.MissingCellPolicy.RETURN_BLANK_AS_NULL))
             }
-            workbook.close()
-        } catch (e: OutOfMemoryError) {
-            Log.e("LeitorExcel", "Arquivo Excel muito grande: ${e.message}")
-            return emptyList()
-        } catch (e: Exception) {
-            Log.e("LeitorExcel", "Erro ao ler Excel: ${e.message}")
-            return emptyList()
         }
-        return lista
+        workbook.close()
+        return Pair(cabecalho, dados)
     }
-
 }

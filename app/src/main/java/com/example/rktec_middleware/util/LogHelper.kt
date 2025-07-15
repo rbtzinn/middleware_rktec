@@ -1,10 +1,13 @@
 package com.example.rktec_middleware.util
 
 import android.content.Context
+import android.os.Environment
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.LogMapeamento
+import com.example.rktec_middleware.data.model.EpcTag
+import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -12,11 +15,147 @@ import java.util.*
 
 object LogHelper {
 
+    // --- FUNÇÃO 1: EXPORTAR A PLANILHA MESTRE ATUALIZADA ---
+    suspend fun exportarPlanilhaCompleta(context: Context, banco: AppDatabase): File? {
+        try {
+            val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
+            val jsonCabecalho = prefs.getString("cabecalho_original", null) ?: return null
+            val cabecalhoOriginal = mutableListOf<String>().apply {
+                val jsonArray = JSONArray(jsonCabecalho)
+                for (i in 0 until jsonArray.length()) add(jsonArray.getString(i))
+            }
+            val mapeamento = banco.mapeamentoDao().buscarPrimeiro() ?: return null
+            val todosOsItens = banco.inventarioDao().listarTodos()
 
+            val workbook = XSSFWorkbook()
+            val sheetInventario = workbook.createSheet("Inventário Final")
+
+            val headerRowInventario = sheetInventario.createRow(0)
+            cabecalhoOriginal.forEachIndexed { index, nomeColuna ->
+                headerRowInventario.createCell(index).setCellValue(nomeColuna)
+            }
+            todosOsItens.forEachIndexed { index, item ->
+                val row = sheetInventario.createRow(index + 1)
+                cabecalhoOriginal.forEachIndexed { colIndex, nomeColuna ->
+                    val valor = when (cabecalhoOriginal.indexOf(nomeColuna)) {
+                        mapeamento.colunaEpc -> item.tag
+                        mapeamento.colunaNome -> item.desc
+                        mapeamento.colunaSetor -> item.localizacao
+                        mapeamento.colunaLoja -> item.loja
+                        else -> item.colunasExtras[nomeColuna] ?: ""
+                    }
+                    row.createCell(colIndex).setCellValue(valor)
+                }
+            }
+
+            val timestamp = SimpleDateFormat("dd-MM-yyyy_HH-mm", Locale.getDefault()).format(Date())
+            val nomeArquivo = "planilha_final_inventario_${timestamp}.xlsx"
+
+            val pasta = criarPastaRelatorios(context)
+            val file = File(pasta, nomeArquivo)
+            FileOutputStream(file).use { workbook.write(it) }
+            workbook.close()
+            return file
+        } catch (e: Exception) {
+            e.printStackTrace(); return null
+        }
+    }
+
+    // --- FUNÇÃO 2: EXPORTAR APENAS O LOG DE EDIÇÕES MANUAIS ---
+    suspend fun exportarLogDeEdicoes(context: Context, banco: AppDatabase): File? {
+        try {
+            val logsDeEdicao = banco.logEdicaoDao().listarTodos()
+            if (logsDeEdicao.isEmpty()) return null
+
+            val workbook = XSSFWorkbook()
+            val sheetLog = workbook.createSheet("Log de Alterações Manuais")
+
+            val headerRowLog = sheetLog.createRow(0)
+            headerRowLog.createCell(0).setCellValue("Data/Hora")
+            headerRowLog.createCell(1).setCellValue("Responsável")
+            headerRowLog.createCell(2).setCellValue("Tag do Item")
+            headerRowLog.createCell(3).setCellValue("Campo Alterado")
+            headerRowLog.createCell(4).setCellValue("Valor Antigo")
+            headerRowLog.createCell(5).setCellValue("Valor Novo")
+
+            logsDeEdicao.forEachIndexed { index, log ->
+                val row = sheetLog.createRow(index + 1)
+                row.createCell(0).setCellValue(log.dataHora)
+                row.createCell(1).setCellValue(log.usuarioResponsavel)
+                row.createCell(2).setCellValue(log.tagDoItem)
+                row.createCell(3).setCellValue(log.campoAlterado)
+                row.createCell(4).setCellValue(log.valorAntigo)
+                row.createCell(5).setCellValue(log.valorNovo)
+            }
+
+            val timestamp = SimpleDateFormat("dd-MM-yyyy_HH-mm", Locale.getDefault()).format(Date())
+            val nomeArquivo = "relatorio_edicoes_manuais_${timestamp}.xlsx"
+
+            val pasta = criarPastaRelatorios(context)
+            val file = File(pasta, nomeArquivo)
+            FileOutputStream(file).use { workbook.write(it) }
+            workbook.close()
+            return file
+        } catch (e: Exception) {
+            e.printStackTrace(); return null
+        }
+    }
+
+    // --- FUNÇÃO 3: REGISTRAR SESSÃO DE INVENTÁRIO ---
+    suspend fun registrarSessaoDeInventario(
+        context: Context,
+        usuario: String,
+        loja: String?,
+        setor: String?,
+        itensEsperados: List<ItemInventario>,
+        itensLidos: List<EpcTag>,
+        itensTotaisDaBase: List<ItemInventario>
+    ): File? {
+        try {
+            val nomeLoja = loja?.replace(" ", "_")?.uppercase() ?: "GERAL"
+            val nomeArquivo = "LOG_INVENTARIO_${nomeLoja}.csv"
+            val pasta = criarPastaRelatorios(context)
+            val file = File(pasta, nomeArquivo)
+            val delimitador = ";"
+
+            file.appendText("\n--- INÍCIO DA SESSÃO DE INVENTÁRIO ---\n", Charsets.UTF_8)
+            file.appendText("Responsável;$usuario\n", Charsets.UTF_8)
+            file.appendText("Data/Hora;${SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())}\n", Charsets.UTF_8)
+            file.appendText("Loja;${loja ?: "Todas"}\n", Charsets.UTF_8)
+            file.appendText("Setor;${setor ?: "Todos"}\n\n", Charsets.UTF_8)
+            file.appendText("Status;Tag EPC;Detalhes\n", Charsets.UTF_8)
+
+            val epcsLidos = itensLidos.map { it.epc }.toSet()
+            val epcsEsperadosNoSetor = itensEsperados.map { it.tag }.toSet()
+
+            val encontrados = epcsLidos.intersect(epcsEsperadosNoSetor)
+            val naoEncontrados = epcsEsperadosNoSetor - epcsLidos
+            val aMais = epcsLidos - epcsEsperadosNoSetor
+
+            encontrados.forEach { file.appendText("ENCONTRADO;$it;Item estava no local esperado.\n", Charsets.UTF_8) }
+            naoEncontrados.forEach { file.appendText("NÃO ENCONTRADO;$it;Item esperado neste setor, mas não foi lido.\n", Charsets.UTF_8) }
+
+            aMais.forEach { epc ->
+                val itemNaBase = itensTotaisDaBase.find { it.tag == epc }
+                when {
+                    itemNaBase == null -> file.appendText("INEXISTENTE NA BASE;$epc;Item lido, mas não consta na planilha original.\n", Charsets.UTF_8)
+                    itemNaBase.loja != loja -> file.appendText("EM OUTRA LOJA;$epc;Item lido, mas pertence à loja '${itemNaBase.loja}'.\n", Charsets.UTF_8)
+                    else -> file.appendText("MOVIDO DE SETOR;$epc;Item pertence a esta loja, mas estava no setor '${itemNaBase.localizacao}'. Foi corrigido.\n", Charsets.UTF_8)
+                }
+            }
+
+            file.appendText("--- FIM DA SESSÃO ---\n", Charsets.UTF_8)
+            return file
+        } catch (e: Exception) {
+            e.printStackTrace(); return null
+        }
+    }
+
+    // --- FUNÇÕES DE LOG DE USUÁRIOS (RESTAURADAS) ---
     suspend fun registrarGerenciamentoUsuario(
         context: Context,
         usuarioResponsavel: String,
-        acao: String, // "EDIÇÃO" ou "EXCLUSÃO"
+        acao: String,
         usuarioAlvo: String,
         motivo: String?,
         detalhes: String
@@ -25,34 +164,13 @@ object LogHelper {
         val db = AppDatabase.getInstance(context.applicationContext)
         db.logGerenciamentoUsuarioDao().inserir(
             LogGerenciamentoUsuario(
-                usuarioResponsavel = usuarioResponsavel,
-                dataHora = dataHora,
-                acao = acao,
-                usuarioAlvo = usuarioAlvo,
-                motivo = motivo,
-                detalhes = detalhes
+                usuarioResponsavel = usuarioResponsavel, dataHora = dataHora, acao = acao,
+                usuarioAlvo = usuarioAlvo, motivo = motivo, detalhes = detalhes
             )
         )
     }
 
-
-
-    suspend fun registrarMapeamento(context: Context, usuario: String, arquivo: String) {
-        val dataHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-        val db = AppDatabase.getInstance(context)
-        db.logMapeamentoDao().inserir(
-            LogMapeamento(
-                usuario = usuario,
-                dataHora = dataHora,
-                arquivo = arquivo
-            )
-        )
-    }
-
-    suspend fun exportarLogsGerenciamentoUsuarioXlsx(
-        context: Context,
-        nomeArquivo: String = "relatorio_log_usuarios.xlsx"
-    ): File {
+    suspend fun exportarLogsGerenciamentoUsuarioXlsx(context: Context): File {
         val db = AppDatabase.getInstance(context)
         val logs = db.logGerenciamentoUsuarioDao().listarTodos()
         val workbook = XSSFWorkbook()
@@ -76,6 +194,7 @@ object LogHelper {
             row.createCell(5).setCellValue(log.detalhes)
         }
 
+        val nomeArquivo = "relatorio_log_usuarios.xlsx"
         val pasta = criarPastaRelatorios(context)
         val file = File(pasta, nomeArquivo)
         FileOutputStream(file).use { workbook.write(it) }
@@ -83,79 +202,18 @@ object LogHelper {
         return file
     }
 
-
-    suspend fun exportarLogsComoCsv(context: Context, nomeArquivo: String = "relatorio_log.csv"): File {
-        val db = AppDatabase.getInstance(context)
-        val logs = db.logMapeamentoDao().listarTodos()
-        val csv = StringBuilder()
-        csv.append("Usuário,DataHora,Arquivo\n")
-        logs.forEach { log ->
-            csv.append("\"${log.usuario}\",\"${log.dataHora}\",\"${log.arquivo}\"\n")
+    // --- FUNÇÕES AUXILIARES ---
+    private fun formatarCelulaCsv(valor: String): String {
+        if (valor.contains(";") || valor.contains("\"") || valor.contains("\n")) {
+            return "\"${valor.replace("\"", "\"\"")}\""
         }
-
-        val pasta = criarPastaRelatorios(context)
-        val arquivo = File(pasta, nomeArquivo)
-        FileOutputStream(arquivo).use { fos ->
-            fos.write(csv.toString().toByteArray())
-        }
-        return arquivo
+        return valor
     }
 
     private fun criarPastaRelatorios(context: Context): File {
-        val downloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-        val pastaRelatorios = File(downloads, "relatorios")
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val pastaRelatorios = File(downloads, "RelatoriosInventario")
         if (!pastaRelatorios.exists()) pastaRelatorios.mkdirs()
         return pastaRelatorios
     }
-
-
-
-    suspend fun exportarRelatorioMapeamentoXlsx(
-        context: Context,
-        usuario: String,
-        arquivo: String,
-        mapeamento: com.example.rktec_middleware.data.model.MapeamentoPlanilha,
-        nomesColunas: List<String>
-    ): File? {
-        val dataHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-        val workbook = XSSFWorkbook()
-        val sheet = workbook.createSheet("Relatório de Mapeamento")
-
-        val header = sheet.createRow(0)
-        header.createCell(0).setCellValue("Usuário")
-        header.createCell(1).setCellValue("Data/Hora")
-        header.createCell(2).setCellValue("Arquivo Importado")
-        header.createCell(3).setCellValue("EPC")
-        header.createCell(4).setCellValue("Nome")
-        header.createCell(5).setCellValue("Setor")
-        header.createCell(6).setCellValue("Loja")
-
-        // Linha de dados
-        val row = sheet.createRow(1)
-        row.createCell(0).setCellValue(usuario)
-        row.createCell(1).setCellValue(dataHora)
-        row.createCell(2).setCellValue(arquivo)
-
-        fun nomeCol(idx: Int?): String =
-            if (idx != null && idx in nomesColunas.indices) nomesColunas[idx] else "Não mapeada"
-
-        row.createCell(3).setCellValue(nomeCol(mapeamento.colunaEpc))
-        row.createCell(4).setCellValue(nomeCol(mapeamento.colunaNome))
-        row.createCell(5).setCellValue(nomeCol(mapeamento.colunaSetor))
-        row.createCell(6).setCellValue(nomeCol(mapeamento.colunaLoja))
-
-        val pasta = criarPastaRelatorios(context)
-        val file = File(pasta, "relatorio_de_mapeamento.xlsx")
-        try {
-            FileOutputStream(file).use { workbook.write(it) }
-            workbook.close()
-            return file
-        } catch (e: Exception) {
-            e.printStackTrace()
-            workbook.close()
-            return null
-        }
-    }
-
 }
-

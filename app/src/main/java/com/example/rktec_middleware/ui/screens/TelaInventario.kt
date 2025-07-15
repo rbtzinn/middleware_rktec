@@ -7,17 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -25,9 +20,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.ui.components.InfoChip
+import com.example.rktec_middleware.ui.components.PrimaryButton
+import com.example.rktec_middleware.ui.components.StandardDropdown
+import com.example.rktec_middleware.ui.theme.*
+
+// Função para normalizar o nome da loja, removendo espaços e aspas
+private fun normalizarNome(nome: String): String {
+    return nome.trim().removeSurrounding("\"")
+}
 
 @Composable
 fun TelaInventario(
@@ -38,200 +41,161 @@ fun TelaInventario(
         listaTotal: List<ItemInventario>,
         listaFiltrada: List<ItemInventario>
     ) -> Unit,
-    onDebugClick: () -> Unit,
     onSobreClick: () -> Unit
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
-
     var dadosImportados by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-    var refresh by remember { mutableStateOf(0) }
-
     var filtroLoja by remember { mutableStateOf<String?>(null) }
     var filtroSetor by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(refresh) {
-        val dadosSalvos = db.inventarioDao().listarTodos()
-        dadosImportados = if (dadosSalvos.isNotEmpty()) dadosSalvos else emptyList()
+    LaunchedEffect(Unit) {
+        dadosImportados = db.inventarioDao().listarTodos()
     }
 
-    val lojasFiltradas by remember(filtroSetor, dadosImportados) {
+    // ALTERAÇÃO 1: Normaliza os nomes das lojas antes de exibi-los no filtro.
+    val lojasDisponiveis by remember(dadosImportados) {
         derivedStateOf {
-            dadosImportados
-                .filter { item -> filtroSetor.isNullOrBlank() || item.localizacao.trim() == filtroSetor }
-                .map { it.loja.trim() }
-                .filter { it.isNotBlank() }
-                .distinct()
+            dadosImportados.map { normalizarNome(it.loja) }.filter { it.isNotBlank() }.distinct()
         }
     }
 
-    val setoresFiltrados by remember(filtroLoja, dadosImportados) {
+    val setoresDisponiveis by remember(filtroLoja, dadosImportados) {
         derivedStateOf {
             dadosImportados
-                .filter { item -> filtroLoja.isNullOrBlank() || item.loja.trim() == filtroLoja }
-                .map { it.localizacao.trim() }
-                .filter { it.isNotBlank() }
-                .map {
-                    it.toDoubleOrNull()?.let { d ->
-                        if (d % 1.0 == 0.0) d.toInt().toString() else it
-                    } ?: it
-                }
-                .distinct()
+                // Garante que a comparação para filtrar os setores também use o nome normalizado.
+                .filter { item -> filtroLoja.isNullOrBlank() || normalizarNome(item.loja) == filtroLoja }
+                .map { it.localizacao.trim() }.filter { it.isNotBlank() }.distinct()
         }
     }
 
+    // A lista de itens a ser exibida, agora filtrando pelo nome da loja normalizado.
     val listaFiltrada = dadosImportados.filter { item ->
-        (filtroLoja.isNullOrEmpty() || item.loja.trim() == filtroLoja) &&
-                (filtroSetor.isNullOrEmpty() || (item.localizacao.trim().toDoubleOrNull()?.let { d -> if (d % 1.0 == 0.0) d.toInt().toString() else item.localizacao.trim() } ?: item.localizacao.trim()) == filtroSetor)
+        (filtroLoja.isNullOrEmpty() || normalizarNome(item.loja) == filtroLoja) &&
+                (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F7FA))
-    ) {
-        // Header moderno
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(110.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color(0xFF174D86),
-                        1f to Color(0xFF4A90E2)
+    RKTecMiddlewareTheme {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+
+            // -- CABEÇALHO --
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp) // Aumentei um pouco a altura para o card não cortar o título
+                    .background(
+                        Brush.verticalGradient(
+                            0f to MaterialTheme.colorScheme.primaryContainer,
+                            1f to MaterialTheme.colorScheme.primary
+                        )
                     )
-                )
-        ) {
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onVoltar,
                     modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.White.copy(alpha = 0.20f), CircleShape)
+                        .align(Alignment.TopStart)
+                        .padding(Dimens.PaddingSmall)
                 ) {
                     Icon(
-                        Icons.Filled.ArrowBack,
+                        Icons.Default.ArrowBack,
                         contentDescription = "Voltar",
                         tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(Dimens.IconSizeLarge)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "Inventário",
+                    style = MaterialTheme.typography.headlineMedium,
                     color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    letterSpacing = 0.5.sp
+                    modifier = Modifier.align(Alignment.Center)
                 )
-                Spacer(modifier = Modifier.width(44.dp))
             }
-        }
 
-        // Painel de filtro compacto
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset(y = (-26).dp)
-                .padding(horizontal = 18.dp)
-                .shadow(elevation = 7.dp, shape = RoundedCornerShape(18.dp)),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
+            // -- FILTROS --
+            // ALTERAÇÃO 2: Movido o Card de filtros para uma Column com offset negativo.
             Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.Start
+                Modifier
+                    .fillMaxWidth()
+                    .offset(y = (-40).dp) // <-- Desloca esta coluna para cima
+                    .padding(horizontal = Dimens.PaddingLarge),
+                verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
             ) {
-                Text(
-                    "Filtros rápidos",
-                    color = Color(0xFF174D86),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    modifier = Modifier.padding(bottom = 7.dp)
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    DropdownFiltroProfissional(
-                        label = "Loja",
-                        opcoes = lojasFiltradas,
-                        selecionado = filtroLoja,
-                        onSelecionado = {
-                            filtroLoja = it
-                            filtroSetor = null // resetar setor ao trocar loja
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    DropdownFiltroProfissional(
-                        label = "Setor",
-                        opcoes = setoresFiltrados,
-                        selecionado = filtroSetor,
-                        onSelecionado = { filtroSetor = it },
-                        modifier = Modifier.weight(1f),
-                        enabled = !filtroLoja.isNullOrBlank()
-                    )
+                    Column(Modifier.padding(Dimens.PaddingMedium)) {
+                        Text(
+                            "Filtros rápidos",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        )
+                        Spacer(Modifier.height(Dimens.PaddingSmall))
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                            StandardDropdown(
+                                label = "Loja",
+                                options = listOf("Todos") + lojasDisponiveis, // Adiciona "Todos"
+                                selectedOption = filtroLoja ?: "Todos",
+                                onOptionSelected = {
+                                    filtroLoja = if (it == "Todos") null else it
+                                    filtroSetor = null // Reseta o setor ao mudar a loja
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            StandardDropdown(
+                                label = "Setor",
+                                options = listOf("Todos") + setoresDisponiveis, // Adiciona "Todos"
+                                selectedOption = filtroSetor ?: "Todos",
+                                onOptionSelected = { filtroSetor = if (it == "Todos") null else it },
+                                modifier = Modifier.weight(1f),
+                                enabled = !filtroLoja.isNullOrBlank() // Habilita se uma loja for selecionada
+                            )
+                        }
+                        Text(
+                            "Itens: ${listaFiltrada.size} / ${dadosImportados.size}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = Dimens.PaddingSmall)
+                        )
+                    }
                 }
-
-                Text(
-                    "Itens: ${listaFiltrada.size} / ${dadosImportados.size}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = Color(0xFF4A90E2),
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .padding(top = 8.dp)
-                )
             }
-        }
 
-        // Conteúdo da lista de inventário
-        Box(
-            Modifier
-                .weight(1f)
-                .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 0.dp)
-        ) {
+
+            // -- LISTA DE ITENS --
             if (dadosImportados.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text(
                         "Nenhum item de inventário encontrado",
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF9CA3AF),
-                        fontSize = 17.sp,
-                        textAlign = TextAlign.Center
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = RktTextSecondary
                     )
                 }
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(
+                        // Removido o padding de cima para o card de filtros ficar mais proximo
+                        start = Dimens.PaddingMedium,
+                        end = Dimens.PaddingMedium,
+                        bottom = Dimens.PaddingMedium
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
                 ) {
-                    items(listaFiltrada) { item ->
-                        ItemInventarioCardNovo(item)
+                    items(listaFiltrada, key = { it.tag }) { item ->
+                        ItemInventarioCard(item)
                     }
                 }
             }
-        }
 
-        // Botão principal na base (float)
-        if (dadosImportados.isNotEmpty()) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Button(
+            // -- BOTÃO E FOOTER --
+            if (dadosImportados.isNotEmpty()) {
+                PrimaryButton(
                     onClick = {
                         onIniciarLeituraInventario(
                             filtroLoja,
@@ -240,170 +204,55 @@ fun TelaInventario(
                             listaFiltrada
                         )
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A90E2))
-                ) {
-                    Text(
-                        "Iniciar Leitura",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp,
-                        color = Color.White
-                    )
-                }
+                    text = "Iniciar Leitura",
+                    modifier = Modifier.padding(Dimens.PaddingMedium)
+                )
             }
-        }
 
-        // Footer minimalista
-        Text(
-            "RKTECNOLOGIAS",
-            color = Color(0xFF009688),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp)
-                .clickable(onClick = onSobreClick),
-            textAlign = TextAlign.Center
-        )
+            Text(
+                "RKTECNOLOGIAS",
+                style = MaterialTheme.typography.labelMedium,
+                color = RktGreen,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = Dimens.PaddingSmall)
+                    .clickable(onClick = onSobreClick),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
-// Card modernizado para item do inventário
 @Composable
-fun ItemInventarioCardNovo(item: ItemInventario) {
+private fun ItemInventarioCard(item: ItemInventario) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 3.dp, shape = RoundedCornerShape(14.dp)),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 13.dp, horizontal = 18.dp)
-        ) {
+        Column(Modifier.padding(Dimens.PaddingMedium)) {
             Text(
                 text = item.desc.ifBlank { "Sem descrição" },
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = Color(0xFF222222),
+                style = MaterialTheme.typography.titleLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = item.tag,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = Color(0xFF4A90E2),
-                modifier = Modifier.padding(top = 2.dp)
+                color = MaterialTheme.colorScheme.primary
             )
             Row(
-                Modifier
-                    .padding(top = 8.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Modifier.padding(top = Dimens.PaddingSmall),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
             ) {
-                if (item.localizacao.isNotBlank()) {
-                    InfoChipNovo("Setor: ${item.localizacao}")
-                }
-                if (item.loja.isNotBlank()) {
-                    InfoChipNovo("Loja: ${item.loja}")
-                }
+                // A exibição aqui continua a mesma, mas a lógica de filtro foi corrigida
+                if (item.loja.isNotBlank()) InfoChip("Loja: ${normalizarNome(item.loja)}")
+                if (item.localizacao.isNotBlank()) InfoChip("Setor: ${item.localizacao}")
             }
         }
     }
 }
-
-// Chip info padronizado (clean)
-@Composable
-fun InfoChipNovo(text: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFE9F2FA))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(
-            text = text,
-            color = Color(0xFF1A6DB0),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-// Dropdown clean e compacto
-@Composable
-fun DropdownFiltroProfissional(
-    label: String,
-    opcoes: List<String>,
-    selecionado: String?,
-    onSelecionado: (String?) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true // <-- adicionado aqui
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val displayText = if (selecionado.isNullOrEmpty()) "Todos" else selecionado
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { if (enabled) expanded = !expanded },
-        modifier = modifier
-    ) {
-        OutlinedTextField(
-            value = displayText,
-            onValueChange = {},
-            label = { Text(label, fontSize = 12.sp, color = Color(0xFF174D86)) },
-            readOnly = true,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            enabled = enabled,
-            modifier = Modifier
-                .menuAnchor()
-                .heightIn(min = 56.dp) // evita corte de texto
-                .clip(RoundedCornerShape(10.dp)),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = Color(0xFFE0E0E0),
-                focusedBorderColor = Color(0xFF4A90E2),
-                focusedLabelColor = Color(0xFF174D86),
-                cursorColor = Color.Transparent,
-                disabledTextColor = Color(0xFFAAAAAA),
-                disabledBorderColor = Color(0xFFDDDDDD),
-                disabledLabelColor = Color(0xFFAAAAAA),
-                unfocusedContainerColor = Color.White
-            ),
-            singleLine = true,
-            textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
-        )
-
-        if (enabled) {
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier
-                    .background(Color.White)
-                    .widthIn(min = 110.dp, max = 220.dp)
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Todos", fontWeight = if (selecionado == null) FontWeight.Bold else FontWeight.Normal) },
-                    onClick = {
-                        onSelecionado(null)
-                        expanded = false
-                    }
-                )
-                opcoes.forEach { opcao ->
-                    DropdownMenuItem(
-                        text = { Text(opcao, fontWeight = if (selecionado == opcao) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = {
-                            onSelecionado(opcao)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-

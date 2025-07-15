@@ -20,5 +20,6 @@ interface InventarioDao {
     @Update
     suspend fun atualizarItem(item: ItemInventario)
 
+    @Query("UPDATE inventario SET localizacao = :novaLocalizacao, foiCorrigidoAutomaticamente = 1 WHERE tag = :tag")
+    suspend fun corrigirSetor(tag: String, novaLocalizacao: String)
 }
-
