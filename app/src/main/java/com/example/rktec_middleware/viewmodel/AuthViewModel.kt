@@ -1,81 +1,86 @@
 package com.example.rktec_middleware.viewmodel
 
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.util.UsuarioLogadoManager
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+// Um estado para deixar claro o que está acontecendo com a autenticação.
+sealed class AuthState {
+    object Carregando : AuthState()
+    data class Autenticado(val usuario: Usuario, val mapeamentoConcluido: Boolean) : AuthState()
+    object NaoAutenticado : AuthState()
+}
+
 class AuthViewModel(
     private val usuarioRepository: UsuarioRepository
 ) : ViewModel() {
 
-    private var autoLoginJaRodou = false
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Carregando)
+    val authState: StateFlow<AuthState> = _authState
 
-    private val _usuarioAutenticado = MutableStateFlow<Usuario?>(null)
-    val usuarioAutenticado: StateFlow<Usuario?> = _usuarioAutenticado
-
-    private val _mapeamentoConcluido = MutableStateFlow(false)
-    val mapeamentoConcluido: StateFlow<Boolean> = _mapeamentoConcluido
-
-    fun recarregarUsuario(email: String) {
+    // Função principal que verifica se o usuário já está logado no Firebase.
+    fun verificarEstadoAutenticacao(isMapeamentoOk: suspend () -> Boolean) {
         viewModelScope.launch {
-            val usuario = usuarioRepository.buscarPorEmail(email)
-            if (usuario != null) {
-                _usuarioAutenticado.value = usuario
+            _authState.value = AuthState.Carregando
+            val firebaseUser = FirebaseAuth.getInstance().currentUser
+
+            if (firebaseUser?.email != null) {
+                // Usuário está logado no Firebase, vamos buscar os dados no Room.
+                val usuarioLocal = usuarioRepository.buscarPorEmail(firebaseUser.email!!)
+                if (usuarioLocal != null && usuarioLocal.ativo) {
+                    val mapeamentoConcluido = isMapeamentoOk()
+                    _authState.value = AuthState.Autenticado(usuarioLocal, mapeamentoConcluido)
+                } else {
+                    // Se não encontrar no Room ou estiver inativo, desloga.
+                    FirebaseAuth.getInstance().signOut()
+                    _authState.value = AuthState.NaoAutenticado
+                }
+            } else {
+                // Nenhum usuário logado no Firebase.
+                _authState.value = AuthState.NaoAutenticado
             }
         }
     }
 
-    fun setMapeamentoConcluido(concluido: Boolean) {
-        _mapeamentoConcluido.value = concluido
+    // Função chamada após o login manual ser bem-sucedido.
+    fun onLoginSucesso(usuario: Usuario, mapeamentoConcluido: Boolean) {
+        _authState.value = AuthState.Autenticado(usuario, mapeamentoConcluido)
     }
 
-    fun login(context: Context, usuario: Usuario) {
-        viewModelScope.launch {
-            _usuarioAutenticado.value = usuario
-
-            // Salvando o login no SharedPreferences
-            val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("usuario_email", usuario.email).apply()
-
-            // (Opcional) também marca mapeamento como feito
-            setMapeamentoConcluido(true)
+    // Função para atualizar o estado do mapeamento após a importação.
+    fun setMapeamentoConcluido(concluido: Boolean) {
+        if (_authState.value is AuthState.Autenticado) {
+            val estadoAtual = _authState.value as AuthState.Autenticado
+            _authState.value = estadoAtual.copy(mapeamentoConcluido = concluido)
         }
     }
 
-    fun autoLogin(context: Context, isMapeamentoOk: suspend () -> Boolean) {
+    // Função de logout agora também limpa o estado do Firebase.
+    fun logout() {
         viewModelScope.launch {
-            val prefs = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-            val email = prefs.getString("usuario_email", null)
+            FirebaseAuth.getInstance().signOut() // Importante: Fazer logout do Firebase.
+            _authState.value = AuthState.NaoAutenticado
+        }
+    }
 
-            if (email != null) {
-                val usuario = usuarioRepository.buscarPorEmail(email)
-                if (usuario != null) {
-                    _usuarioAutenticado.value = usuario
-                    setMapeamentoConcluido(isMapeamentoOk())
+    // Função para recarregar os dados do usuário se forem editados.
+    fun recarregarUsuario() {
+        if (_authState.value is AuthState.Autenticado) {
+            viewModelScope.launch {
+                val estadoAtual = _authState.value as AuthState.Autenticado
+                val usuarioAtualizado = usuarioRepository.buscarPorEmail(estadoAtual.usuario.email)
+                if (usuarioAtualizado != null) {
+                    _authState.value = estadoAtual.copy(usuario = usuarioAtualizado)
+                } else {
+                    logout() // Se o usuário for deletado, faz logout.
                 }
             }
         }
     }
-
-    fun logout(context: Context) {
-        viewModelScope.launch {
-            _usuarioAutenticado.value = null
-            context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .apply()
-            setMapeamentoConcluido(false)
-        }
-    }
-
-
-
 }

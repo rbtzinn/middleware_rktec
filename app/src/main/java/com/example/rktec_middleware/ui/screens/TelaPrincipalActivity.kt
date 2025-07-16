@@ -20,20 +20,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.dao.UsuarioDao // Import necessário
+import com.example.rktec_middleware.data.dao.UsuarioDao
 import com.example.rktec_middleware.data.model.TipoUsuario
+import com.example.rktec_middleware.data.model.Usuario // Import necessário
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.components.AvatarComGestoSecreto
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
 import com.example.rktec_middleware.viewmodel.AuthViewModel
+import com.example.rktec_middleware.viewmodel.AuthState // Import necessário
 import kotlinx.coroutines.launch
 
 @Composable
 fun TelaPrincipal(
-    usuarioDao: UsuarioDao, // <-- PARÂMETRO ADICIONADO DE VOLTA
+    usuarioDao: UsuarioDao,
     authViewModel: AuthViewModel,
+    onColetaAvulsaClick: () -> Unit,
     usuarioRepository: UsuarioRepository,
     onInventarioClick: () -> Unit,
     onDebugClick: () -> Unit,
@@ -41,170 +44,189 @@ fun TelaPrincipal(
     onSairClick: () -> Unit,
     onGerenciarUsuariosClick: () -> Unit
 ) {
-    val usuario by authViewModel.usuarioAutenticado.collectAsState()
+    // --- CORREÇÃO 1: Acessar o usuário através do novo authState ---
+    val authState by authViewModel.authState.collectAsState()
+    var usuario: Usuario? = null
+    if (authState is AuthState.Autenticado) {
+        usuario = (authState as AuthState.Autenticado).usuario
+    }
+
     var mostrarDialogSair by remember { mutableStateOf(false) }
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
-    var loadingPromoverAdmin by remember { mutableStateOf(false) }
-    var erroCodigoAdmin by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val appDatabase = AppDatabase.getInstance(context)
 
     RKTecMiddlewareTheme {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                // Header
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(140.dp).background(
-                        Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer, 1f to MaterialTheme.colorScheme.primary)
-                    )
-                ) {
-                    Row(
-                        Modifier.fillMaxSize().padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AvatarComGestoSecreto(
-                            nomeUsuario = usuario?.nome ?: "",
-                            onGestoDetectado = { if (usuario?.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
+        if (usuario == null) {
+            // Mostra um carregamento enquanto o estado do usuário é resolvido
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    // Header
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(140.dp).background(
+                            Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer, 1f to MaterialTheme.colorScheme.primary)
                         )
-                        Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
-                        Column {
-                            Text("Bem-vindo!", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f)))
-                            Text(usuario?.nome ?: "Usuário", style = MaterialTheme.typography.headlineMedium.copy(color = Color.White))
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(
-                            onClick = { mostrarDialogSair = true },
-                            modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
+                    ) {
+                        Row(
+                            Modifier.fillMaxSize().padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = "Sair", tint = Color.White, modifier = Modifier.size(Dimens.IconSizeMedium))
-                        }
-                    }
-                }
-
-                // Feature Cards
-                Column(
-                    Modifier.fillMaxWidth().offset(y = (-30).dp).padding(horizontal = Dimens.PaddingLarge),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
-                ) {
-                    FeatureCard(
-                        title = "Inventário", subtitle = "Controle e acompanhe o estoque",
-                        icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick
-                    )
-                    FeatureCard(
-                        title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados",
-                        icon = Icons.Default.UploadFile, color = RktBlueInfo,
-                        onClick = {
-                            scope.launch {
-                                Toast.makeText(context, "Gerando planilha final...", Toast.LENGTH_SHORT).show()
-                                val arquivo = LogHelper.exportarPlanilhaCompleta(context, appDatabase)
-                                Toast.makeText(
-                                    context,
-                                    if (arquivo != null) "Planilha salva em ${arquivo.parent}" else "Falha ao gerar a planilha.",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                            AvatarComGestoSecreto(
+                                nomeUsuario = usuario.nome,
+                                onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
+                            )
+                            Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
+                            Column {
+                                Text("Bem-vindo!", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f)))
+                                Text(usuario.nome, style = MaterialTheme.typography.headlineMedium.copy(color = Color.White))
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            IconButton(
+                                onClick = { mostrarDialogSair = true },
+                                modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.ExitToApp, contentDescription = "Sair", tint = Color.White, modifier = Modifier.size(Dimens.IconSizeMedium))
                             }
                         }
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-
-                // Footer
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Dimens.PaddingMedium),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (usuario?.tipo == TipoUsuario.ADMIN) {
-                        TextButton(onClick = onDebugClick) {
-                            Text("Consulta e Edição de Itens", color = RktTextSecondary)
-                        }
                     }
-                    Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
+
+                    // Feature Cards
+                    Column(
+                        Modifier.fillMaxWidth().offset(y = (-30).dp).padding(horizontal = Dimens.PaddingLarge),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                     ) {
-                        TextButton(onClick = onSobreClick) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Sobre",
-                                tint = RktGreen,
-                                modifier = Modifier.size(Dimens.IconSizeSmall)
+                            FeatureCard(
+                                title = "Inventário", subtitle = "Controle e acompanhe o estoque",
+                                icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick
                             )
-                            Spacer(Modifier.width(Dimens.PaddingSmall))
-                            Text("Sobre o Sistema", color = RktGreen, fontWeight = FontWeight.SemiBold)
-                        }
+
+                            // --- 2. BOTÃO ADICIONADO DE VOLTA ---
+                            FeatureCard(
+                                title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio",
+                                icon = Icons.Default.DocumentScanner, // Ícone sugestivo
+                                color = RktOrange, // Cor sugestiva
+                                onClick = onColetaAvulsaClick
+                            )
+                        FeatureCard(
+                            title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados",
+                            icon = Icons.Default.UploadFile, color = RktBlueInfo,
+                            onClick = {
+                                scope.launch {
+                                    Toast.makeText(context, "Gerando planilha final...", Toast.LENGTH_SHORT).show()
+                                    val arquivo = LogHelper.exportarPlanilhaCompleta(context, appDatabase)
+                                    Toast.makeText(
+                                        context,
+                                        if (arquivo != null) "Planilha salva em ${arquivo.parent}" else "Falha ao gerar a planilha.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        )
                     }
-                    Text(
-                        "RKTECNOLOGIAS",
-                        fontWeight = FontWeight.Bold,
-                        color = RktGreen,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        "Todos os direitos reservados",
-                        style = MaterialTheme.typography.labelMedium
-                    )
 
+                    Spacer(modifier = Modifier.weight(1f))
+
+
+                    // Footer
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Dimens.PaddingMedium),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (usuario.tipo == TipoUsuario.ADMIN) {
+                            TextButton(onClick = onDebugClick) {
+                                Text("Consulta e Edição de Itens", color = RktTextSecondary)
+                            }
+                        }
+                        Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TextButton(onClick = onSobreClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Sobre",
+                                    tint = RktGreen,
+                                    modifier = Modifier.size(Dimens.IconSizeSmall)
+                                )
+                                Spacer(Modifier.width(Dimens.PaddingSmall))
+                                Text("Sobre o Sistema", color = RktGreen, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        Text(
+                            "RKTECNOLOGIAS",
+                            fontWeight = FontWeight.Bold,
+                            color = RktGreen,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            "Todos os direitos reservados",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+
+                    }
                 }
-            }
 
-            if (usuario?.tipo == TipoUsuario.ADMIN) {
-                FloatingActionButton(
-                    onClick = onGerenciarUsuariosClick,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(Dimens.PaddingLarge),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.Default.ManageAccounts, "Gerenciar Usuários")
+                if (usuario.tipo == TipoUsuario.ADMIN) {
+                    FloatingActionButton(
+                        onClick = onGerenciarUsuariosClick,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(Dimens.PaddingLarge),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Icon(Icons.Default.ManageAccounts, "Gerenciar Usuários")
+                    }
                 }
-            }
 
-            // --- DIALOGS ---
-            if (mostrarDialogSair) {
-                AlertDialog(
-                    onDismissRequest = { mostrarDialogSair = false },
-                    title = { Text("Confirmar Saída") },
-                    text = { Text("Deseja realmente sair do aplicativo?") },
-                    confirmButton = { Button(onClick = onSairClick) { Text("Sair") } },
-                    dismissButton = { TextButton(onClick = { mostrarDialogSair = false }) { Text("Cancelar") } }
-                )
-            }
+                // --- DIALOGS ---
+                if (mostrarDialogSair) {
+                    AlertDialog(
+                        onDismissRequest = { mostrarDialogSair = false },
+                        title = { Text("Confirmar Saída") },
+                        text = { Text("Deseja realmente sair do aplicativo?") },
+                        confirmButton = { Button(onClick = onSairClick) { Text("Sair") } },
+                        dismissButton = { TextButton(onClick = { mostrarDialogSair = false }) { Text("Cancelar") } }
+                    )
+                }
 
-            if (mostrarDialogAdmin) {
-                DialogPromoverAdmin(
-                    onConfirmar = { codigoDigitado ->
-                        if (codigoDigitado == "@DM2025") {
-                            scope.launch {
-                                usuario?.let { usuarioSeguro ->
-                                    val usuarioPromovido = usuarioSeguro.copy(tipo = TipoUsuario.ADMIN)
+                if (mostrarDialogAdmin) {
+                    DialogPromoverAdmin(
+                        onConfirmar = { codigoDigitado ->
+                            if (codigoDigitado == "@DM2025") {
+                                scope.launch {
+                                    val usuarioPromovido = usuario.copy(tipo = TipoUsuario.ADMIN)
                                     usuarioRepository.atualizarUsuario(usuarioPromovido)
-                                    authViewModel.recarregarUsuario(usuarioSeguro.email)
+                                    // --- CORREÇÃO 2: Chamar a função sem argumentos ---
+                                    authViewModel.recarregarUsuario()
                                     LogHelper.registrarGerenciamentoUsuario(
                                         context = context, usuarioResponsavel = "SISTEMA", acao = "PROMOÇÃO ADM",
-                                        usuarioAlvo = usuarioSeguro.email, motivo = "Promoção via código secreto",
+                                        usuarioAlvo = usuario.email, motivo = "Promoção via código secreto",
                                         detalhes = "Usuário promovido a ADMIN pelo código secreto."
                                     )
                                     Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
+                                    mostrarDialogAdmin = false
                                 }
-                                mostrarDialogAdmin = false
+                                return@DialogPromoverAdmin true
+                            } else {
+                                return@DialogPromoverAdmin false
                             }
-                            return@DialogPromoverAdmin true
-                        } else {
-                            return@DialogPromoverAdmin false
-                        }
-                    },
-                    onCancelar = { mostrarDialogAdmin = false }
-                )
+                        },
+                        onCancelar = { mostrarDialogAdmin = false }
+                    )
+                }
             }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

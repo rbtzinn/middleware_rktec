@@ -28,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.rktec_middleware.ui.components.GradientHeader
 import com.example.rktec_middleware.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,19 +37,7 @@ fun TelaSobre(onVoltar: () -> Unit) {
     RKTecMiddlewareTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Sobre o Aplicativo") },
-                    navigationIcon = {
-                        IconButton(onClick = onVoltar) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
+                GradientHeader(title = "Sobre o Aplicativo", onVoltar = onVoltar)
             }
         ) { paddingValues ->
             LazyColumn(

@@ -116,7 +116,7 @@ fun TelaInventario(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .offset(y = (-40).dp) // <-- Desloca esta coluna para cima
+                    .offset(y = (-25).dp)
                     .padding(horizontal = Dimens.PaddingLarge),
                 verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
             ) {

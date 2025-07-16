@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 val RktBluePrimary = Color(0xFF4A90E2)
 val RktBlueDark = Color(0xFF174D86)
 val RktBlueLight = Color(0xFFE3F2FD)
+val RktOrange = Color(0xFFF57C00)
 
 // Cores Semânticas
 val RktGreen = Color(0xFF2E7D32)

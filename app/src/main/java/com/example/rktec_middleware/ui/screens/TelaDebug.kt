@@ -23,6 +23,8 @@ import com.example.rktec_middleware.data.model.*
 import com.example.rktec_middleware.ui.components.InfoChip
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
+import com.example.rktec_middleware.data.dao.InventarioDao
+import com.example.rktec_middleware.ui.components.GradientHeader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,15 +63,7 @@ fun TelaDebug(
     RKTecMiddlewareTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Consulta e Edição") },
-                    navigationIcon = { IconButton(onClick = onVoltar) { Icon(Icons.Default.ArrowBack, "Voltar") } },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
+                GradientHeader(title = "Consulta e Edição", onVoltar = onVoltar)
             }
         ) { paddingValues ->
             Column(
@@ -155,7 +149,7 @@ fun TelaDebug(
                             scope.launch {
                                 // CORREÇÃO APLICADA AQUI
                                 withContext(Dispatchers.IO) {
-                                    banco.clearAllTables() // Executando em segundo plano
+                                    banco.inventarioDao().limparInventario()  // Executando em segundo plano
                                 }
                                 onBancoLimpo()
                                 Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()

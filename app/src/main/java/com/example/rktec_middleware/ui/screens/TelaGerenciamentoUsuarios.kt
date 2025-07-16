@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
+import com.example.rktec_middleware.ui.components.GradientHeader
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogUtil
@@ -45,19 +46,7 @@ fun TelaGerenciamentoUsuarios(
     RKTecMiddlewareTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Gerenciamento de Usuários") },
-                    navigationIcon = {
-                        IconButton(onClick = onVoltar) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
+                GradientHeader(title = "Gerenciamento de Usuários", onVoltar = onVoltar)
             },
             containerColor = RktBackground
         ) { padding ->

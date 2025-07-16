@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import com.example.rktec_middleware.ui.components.GradientHeader
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.viewmodel.RfidViewModel
@@ -35,31 +36,20 @@ fun TelaLeituraColeta(
     RKTecMiddlewareTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Coleta de Tags") },
-                    navigationIcon = {
-                        IconButton(onClick = { isDialogVoltarAberto = true }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
+                GradientHeader(
+                    title = "Coleta de Tags",
+                    onVoltar = { isDialogVoltarAberto = true }
+                ) { // Este é o espaço para os ícones de ação
+                    IconButton(onClick = {
+                        if (naoMostrarLimpar || tagList.isEmpty()) {
+                            viewModel.limparTags()
+                        } else {
+                            isDialogLimparAberto = true
                         }
-                    },
-                    actions = {
-                        IconButton(onClick = {
-                            if (naoMostrarLimpar || tagList.isEmpty()) {
-                                viewModel.limparTags()
-                            } else {
-                                isDialogLimparAberto = true
-                            }
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Limpar tags")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Limpar tags", tint = Color.White)
+                    }
+                }
             }
         ) { paddingValues ->
             Column(
