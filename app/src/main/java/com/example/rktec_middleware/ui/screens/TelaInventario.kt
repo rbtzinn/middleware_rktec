@@ -27,19 +27,19 @@ import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.components.StandardDropdown
 import com.example.rktec_middleware.ui.theme.*
 
-// Função para normalizar o nome da loja, removendo espaços e aspas
+// NOVA VERSÃO - MAIS ROBUSTA
 private fun normalizarNome(nome: String): String {
-    return nome.trim().removeSurrounding("\"")
+    return nome
+        .replace("\"", "")
+        .trim()
+        .uppercase()
 }
-
 @Composable
 fun TelaInventario(
     onVoltar: () -> Unit,
     onIniciarLeituraInventario: (
         filtroLoja: String?,
-        filtroSetor: String?,
-        listaTotal: List<ItemInventario>,
-        listaFiltrada: List<ItemInventario>
+        filtroSetor: String?
     ) -> Unit,
     onSobreClick: () -> Unit
 ) {
@@ -200,8 +200,6 @@ fun TelaInventario(
                         onIniciarLeituraInventario(
                             filtroLoja,
                             filtroSetor,
-                            dadosImportados,
-                            listaFiltrada
                         )
                     },
                     text = "Iniciar Leitura",

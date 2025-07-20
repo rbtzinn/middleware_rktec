@@ -12,9 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
@@ -22,11 +24,20 @@ import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
 import com.example.rktec_middleware.viewmodel.RfidViewModel
+import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private enum class StatusInventario {
     VERDE, AMARELO, CINZA, VERMELHO, CORRIGIDO
+}
+
+// ALTERAÇÃO: Adicionada a função de normalização que antes estava na outra tela.
+private fun normalizarNome(nome: String): String {
+    return nome
+        .replace("\"", "")
+        .trim()
+        .uppercase()
 }
 
 @Composable
@@ -53,32 +64,49 @@ fun TelaLeituraInventario(
     onVoltar: () -> Unit,
     banco: AppDatabase,
     usuarioLogado: String,
-    listaFiltrada: List<ItemInventario>,
-    listaTotal: List<ItemInventario>,
     filtroLoja: String?,
     filtroSetor: String?
 ) {
-    val viewModel = viewModel<RfidViewModel>()
+
+    val context = LocalContext.current
+    val viewModelFactory = RfidViewModelFactory(context)
+    val viewModel: RfidViewModel = viewModel(factory = viewModelFactory)
     val tagsLidas by viewModel.tagList.collectAsState()
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val tagsCorrigidasNaSessao = remember { mutableStateListOf<String>() }
+
+    // ALTERAÇÃO: As listas agora são estados locais desta tela.
+    var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+    var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+
+    // ALTERAÇÃO: Carrega os dados do banco de dados em segundo plano quando a tela abre.
+    LaunchedEffect(filtroLoja, filtroSetor) {
+        launch(Dispatchers.IO) {
+            val todosOsItens = banco.inventarioDao().listarTodos()
+            listaTotal = todosOsItens
+
+            // Filtra a lista com base nos filtros recebidos
+            listaFiltrada = todosOsItens.filter { item ->
+                (filtroLoja.isNullOrEmpty() || normalizarNome(item.loja) == filtroLoja) &&
+                        (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
+            }
+        }
+    }
+
 
     RKTecMiddlewareTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Inventário") },
-                    navigationIcon = {
-                        IconButton(onClick = onVoltar) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp) // Altura padrão para um cabeçalho
+                        .background(
+                            Brush.verticalGradient(
+                                0f to MaterialTheme.colorScheme.primaryContainer,
+                                1f to MaterialTheme.colorScheme.primary
+                            )
+                        )
                 )
             },
             containerColor = MaterialTheme.colorScheme.background
@@ -97,6 +125,7 @@ fun TelaLeituraInventario(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+                // Agora este contador vai funcionar corretamente!
                 Text(
                     "Lidos: ${tagsLidas.size} / Esperado: ${listaFiltrada.size}",
                     style = MaterialTheme.typography.bodyLarge,
@@ -211,8 +240,9 @@ private fun statusTag(
     listaFiltrada: List<ItemInventario>,
     listaTotal: List<ItemInventario>
 ): StatusInventario {
+    // Agora a 'listaFiltrada' e 'listaTotal' são as que foram carregadas dentro desta tela
     if (listaFiltrada.any { it.tag == epc }) return StatusInventario.VERDE
-    if (filtroLoja != null && listaTotal.any { it.tag == epc && it.loja == filtroLoja }) return StatusInventario.AMARELO
+    if (filtroLoja != null && listaTotal.any { it.tag == epc && normalizarNome(it.loja) == filtroLoja }) return StatusInventario.AMARELO
     if (listaTotal.any { it.tag == epc }) return StatusInventario.CINZA
     return StatusInventario.VERMELHO
 }

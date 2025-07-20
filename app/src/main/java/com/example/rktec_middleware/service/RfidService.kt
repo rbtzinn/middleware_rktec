@@ -1,37 +1,42 @@
+// service/RfidService.kt
 package com.example.rktec_middleware.service
 
 import android.content.Context
-import com.example.rktec_middleware.data.model.EpcTag
-import kotlinx.coroutines.flow.MutableSharedFlow
+import android.util.Log
+import com.example.rktec_middleware.data.model.RfidScanEvent
 import com.pda.rfid.IAsynchronousMessage
-import com.pda.rfid.uhf.UHFReader
 import com.pda.rfid.EPCModel
+import com.pda.rfid.uhf.UHFReader
 import com.port.Adapt
+import kotlinx.coroutines.flow.MutableSharedFlow
 
-class RfidService(context: Context) {
-    val tagsFlow = MutableSharedFlow<EpcTag>(extraBufferCapacity = 64)
+class RfidService(private val context: Context) {
+    val tagsFlow = MutableSharedFlow<RfidScanEvent>(extraBufferCapacity = 64)
 
     private var aberto = false
     private var lendo = false
 
     private val callback = object : IAsynchronousMessage {
         override fun OutPutEPC(model: EPCModel?) {
-            model?._EPC?.let { epc ->
-                tagsFlow.tryEmit(EpcTag(epc))
+            if (model?._EPC != null && model._RSSI != null) {
+                // ALTERAÇÃO: Convertemos o RSSI para String, pois ele vem como um número (Byte).
+                tagsFlow.tryEmit(RfidScanEvent(epc = model._EPC, rssi = model._RSSI.toString()))
             }
         }
     }
 
-    init {
+    fun inicializarHardware() {
         try {
             Adapt.init(context)
             UHFReader.getUHFInstance().OpenConnect(callback)
             aberto = true
-            // Configuração padrão
+
             UHFReader._Config.SetEPCBaseBandParam(255, 0, 1, 0)
             UHFReader._Config.SetANTPowerParam(1, 20)
+
         } catch (e: Exception) {
             aberto = false
+            Log.e("RfidService", "Falha ao inicializar o leitor de RFID", e)
         }
     }
 

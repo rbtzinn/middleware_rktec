@@ -31,7 +31,7 @@ fun TelaLeituraColeta(
     val tagList by viewModel.tagList.collectAsState()
     var isDialogVoltarAberto by remember { mutableStateOf(false) }
     var isDialogLimparAberto by remember { mutableStateOf(false) }
-    var naoMostrarLimpar by rememberSaveable { mutableStateOf(false) }
+    var naoMostrarLimpar by remember { mutableStateOf(false) }
 
     RKTecMiddlewareTheme {
         Scaffold(

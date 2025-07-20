@@ -17,7 +17,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.screens.*
@@ -45,14 +44,12 @@ class MainActivity : ComponentActivity() {
                 val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(usuarioRepository))
                 val authState by authViewModel.authState.collectAsState()
 
-                // Verifica o estado da autenticação apenas uma vez quando o app inicia.
                 LaunchedEffect(Unit) {
                     authViewModel.verificarEstadoAutenticacao {
                         appDatabase.mapeamentoDao().buscarPrimeiro() != null
                     }
                 }
 
-                // --- LÓGICA DE NAVEGAÇÃO CORRIGIDA ---
                 when (val state = authState) {
                     is AuthState.Carregando -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -68,7 +65,6 @@ class MainActivity : ComponentActivity() {
                                         scope.launch {
                                             val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro() != null
                                             authViewModel.onLoginSucesso(usuario, mapeamento)
-                                            // A navegação agora é controlada pela mudança de estado.
                                         }
                                     }
                                 )
@@ -79,13 +75,6 @@ class MainActivity : ComponentActivity() {
                         val usuarioAutenticado = state.usuario
                         val startDestination = if (state.mapeamentoConcluido) Screen.Principal.route else Screen.Importacao.route
 
-                        // Variáveis de estado para as telas internas
-                        var filtroLoja by remember { mutableStateOf<String?>(null) }
-                        var filtroSetor by remember { mutableStateOf<String?>(null) }
-                        var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-                        var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-                        var refreshDebug by remember { mutableStateOf(0) }
-
                         NavHost(navController = navController, startDestination = startDestination) {
                             composable(Screen.Principal.route) {
                                 TelaPrincipal(
@@ -93,9 +82,9 @@ class MainActivity : ComponentActivity() {
                                     usuarioRepository = usuarioRepository,
                                     authViewModel = authViewModel,
                                     onInventarioClick = { navController.navigate(Screen.Inventario.route) },
-                                    // --- ADICIONE ESTA LINHA ---
+                                    onChecagemClick = { navController.navigate(Screen.Checagem.route) },
                                     onColetaAvulsaClick = {
-                                        navController.navigate("coleta_avulsa") // Verifique se esta rota é a mesma
+                                        navController.navigate(Screen.ColetaAvulsa.route)
                                     },
                                     onDebugClick = { navController.navigate(Screen.Debug.route) },
                                     onSobreClick = { navController.navigate(Screen.Sobre.route) },
@@ -105,9 +94,17 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                            composable("coleta_avulsa") { // Use o nome exato da sua rota
+
+                            composable(Screen.Checagem.route) {
+                                TelaChecagem(
+                                    onVoltar = { navController.popBackStack() },
+                                    banco = appDatabase
+                                )
+                            }
+
+                            composable(Screen.ColetaAvulsa.route) {
                                 TelaLeituraColeta(
-                                    viewModel = viewModel, // O RfidViewModel que já existe na MainActivity
+                                    viewModel = viewModel,
                                     onVoltar = {
                                         navController.popBackStack()
                                     }
@@ -118,7 +115,6 @@ class MainActivity : ComponentActivity() {
                                 TelaImportacao(
                                     onConcluido = {
                                         authViewModel.setMapeamentoConcluido(true)
-                                        refreshDebug++
                                         navController.navigate(Screen.Principal.route) { popUpTo(Screen.Importacao.route) { inclusive = true } }
                                     },
                                     usuario = usuarioAutenticado.nome,
@@ -129,38 +125,40 @@ class MainActivity : ComponentActivity() {
                             composable(Screen.Inventario.route) {
                                 TelaInventario(
                                     onVoltar = { navController.popBackStack() },
-                                    onIniciarLeituraInventario = { loja, setor, total, filtrada ->
-                                        filtroLoja = loja
-                                        filtroSetor = setor
-                                        listaTotal = total
-                                        listaFiltrada = filtrada
-                                        navController.navigate(Screen.LeituraInventario.route)
+                                    onIniciarLeituraInventario = { loja, setor ->
+                                        navController.navigate("${Screen.LeituraInventario.route}/$loja/$setor")
                                     },
                                     onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                 )
                             }
 
-                            composable(Screen.LeituraInventario.route) {
+                            composable(
+                                route = "${Screen.LeituraInventario.route}/{filtroLoja}/{filtroSetor}",
+                            ) { backStackEntry ->
+                                val loja = backStackEntry.arguments?.getString("filtroLoja")
+                                val setor = backStackEntry.arguments?.getString("filtroSetor")
                                 TelaLeituraInventario(
                                     onVoltar = { navController.popBackStack() },
                                     banco = appDatabase,
                                     usuarioLogado = usuarioAutenticado.nome,
-                                    listaFiltrada = listaFiltrada,
-                                    listaTotal = listaTotal,
-                                    filtroLoja = filtroLoja,
-                                    filtroSetor = filtroSetor
+                                    filtroLoja = if (loja == "null") null else loja,
+                                    filtroSetor = if (setor == "null") null else setor
                                 )
                             }
 
                             composable(Screen.Debug.route) {
+                                // ALTERAÇÃO: Adicionando de volta a variável de estado que faltava.
+                                var refreshDebug by remember { mutableStateOf(0) }
                                 TelaDebug(
                                     banco = appDatabase,
+                                    // Passando o parâmetro que faltava
                                     refresh = refreshDebug,
                                     usuarioLogado = usuarioAutenticado.nome,
                                     onVoltar = { navController.popBackStack() },
+                                    // Passando o parâmetro que faltava
                                     onBancoLimpo = {
                                         authViewModel.setMapeamentoConcluido(false)
-                                        // A navegação para a importação ocorrerá automaticamente.
+                                        refreshDebug++
                                     }
                                 )
                             }
@@ -170,19 +168,21 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable(Screen.GerenciamentoUsuarios.route) {
+                                // ALTERAÇÃO: Adicionando de volta a lógica para buscar os usuários.
                                 var usuarios by remember { mutableStateOf<List<Usuario>>(emptyList()) }
                                 LaunchedEffect(Unit) {
                                     usuarios = usuarioRepository.listarTodos()
                                 }
                                 TelaGerenciamentoUsuarios(
+                                    // Passando os parâmetros que faltavam
                                     usuarios = usuarios.distinctBy { it.email },
-                                    usuarioRepository = usuarioRepository,
-                                    usuarioLogadoEmail = usuarioAutenticado.email,
-                                    context = context,
                                     onAtualizarLista = {
                                         scope.launch { usuarios = usuarioRepository.listarTodos() }
                                         authViewModel.recarregarUsuario()
                                     },
+                                    usuarioRepository = usuarioRepository,
+                                    usuarioLogadoEmail = usuarioAutenticado.email,
+                                    context = context,
                                     onVoltar = { navController.popBackStack() }
                                 )
                             }

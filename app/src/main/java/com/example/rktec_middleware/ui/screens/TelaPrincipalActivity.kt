@@ -1,9 +1,15 @@
-// ui/screens/TelaPrincipal.kt
+// ui/screens/TelaPrincipalActivity.kt
 package com.example.rktec_middleware.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -13,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -22,14 +29,14 @@ import androidx.compose.ui.unit.dp
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.dao.UsuarioDao
 import com.example.rktec_middleware.data.model.TipoUsuario
-import com.example.rktec_middleware.data.model.Usuario // Import necessário
+import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.components.AvatarComGestoSecreto
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
 import com.example.rktec_middleware.viewmodel.AuthViewModel
-import com.example.rktec_middleware.viewmodel.AuthState // Import necessário
+import com.example.rktec_middleware.viewmodel.AuthState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -39,12 +46,12 @@ fun TelaPrincipal(
     onColetaAvulsaClick: () -> Unit,
     usuarioRepository: UsuarioRepository,
     onInventarioClick: () -> Unit,
+    onChecagemClick: () -> Unit,
     onDebugClick: () -> Unit,
     onSobreClick: () -> Unit,
     onSairClick: () -> Unit,
     onGerenciarUsuariosClick: () -> Unit
 ) {
-    // --- CORREÇÃO 1: Acessar o usuário através do novo authState ---
     val authState by authViewModel.authState.collectAsState()
     var usuario: Usuario? = null
     if (authState is AuthState.Autenticado) {
@@ -53,6 +60,7 @@ fun TelaPrincipal(
 
     var mostrarDialogSair by remember { mutableStateOf(false) }
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
+    var mostrarDialogExportar by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -60,7 +68,6 @@ fun TelaPrincipal(
 
     RKTecMiddlewareTheme {
         if (usuario == null) {
-            // Mostra um carregamento enquanto o estado do usuário é resolvido
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -101,32 +108,40 @@ fun TelaPrincipal(
                         Modifier.fillMaxWidth().offset(y = (-30).dp).padding(horizontal = Dimens.PaddingLarge),
                         verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                     ) {
-                            FeatureCard(
-                                title = "Inventário", subtitle = "Controle e acompanhe o estoque",
-                                icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick
-                            )
-
-                            // --- 2. BOTÃO ADICIONADO DE VOLTA ---
-                            FeatureCard(
-                                title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio",
-                                icon = Icons.Default.DocumentScanner, // Ícone sugestivo
-                                color = RktOrange, // Cor sugestiva
-                                onClick = onColetaAvulsaClick
-                            )
                         FeatureCard(
-                            title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados",
-                            icon = Icons.Default.UploadFile, color = RktBlueInfo,
-                            onClick = {
-                                scope.launch {
-                                    Toast.makeText(context, "Gerando planilha final...", Toast.LENGTH_SHORT).show()
-                                    val arquivo = LogHelper.exportarPlanilhaCompleta(context, appDatabase)
-                                    Toast.makeText(
-                                        context,
-                                        if (arquivo != null) "Planilha salva em ${arquivo.parent}" else "Falha ao gerar a planilha.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            }
+                            title = "Inventário",
+                            subtitle = "Controle e acompanhe o estoque",
+                            icon = Icons.Default.ListAlt,
+                            color = RktGreen,
+                            onClick = onInventarioClick,
+                            description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas."
+                        )
+
+                        FeatureCard(
+                            title = "Checagem de Item",
+                            subtitle = "Verifique uma única etiqueta",
+                            icon = Icons.Default.QrCodeScanner,
+                            color = RktBlueInfo,
+                            onClick = onChecagemClick,
+                            description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente."
+                        )
+
+                        FeatureCard(
+                            title = "Coleta Avulsa",
+                            subtitle = "Leia tags sem um inventário prévio",
+                            icon = Icons.Default.DocumentScanner,
+                            color = RktOrange,
+                            onClick = onColetaAvulsaClick,
+                            description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa."
+                        )
+
+                        FeatureCard(
+                            title = "Exportar Planilha Final",
+                            subtitle = "Gera o relatório mestre com os dados",
+                            icon = Icons.Default.UploadFile,
+                            color = RktBlueInfo,
+                            onClick = { mostrarDialogExportar = true },
+                            description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados."
                         )
                     }
 
@@ -171,7 +186,6 @@ fun TelaPrincipal(
                             "Todos os direitos reservados",
                             style = MaterialTheme.typography.labelMedium
                         )
-
                     }
                 }
 
@@ -187,6 +201,36 @@ fun TelaPrincipal(
                 }
 
                 // --- DIALOGS ---
+                if (mostrarDialogExportar) {
+                    AlertDialog(
+                        onDismissRequest = { mostrarDialogExportar = false },
+                        icon = { Icon(Icons.Default.UploadFile, contentDescription = null) },
+                        title = { Text("Confirmar Exportação") },
+                        text = { Text("Deseja realmente gerar a planilha final com todos os dados do inventário?") },
+                        confirmButton = {
+                            Button(onClick = {
+                                scope.launch {
+                                    Toast.makeText(context, "Gerando planilha final...", Toast.LENGTH_SHORT).show()
+                                    val arquivo = LogHelper.exportarPlanilhaCompleta(context, appDatabase)
+                                    Toast.makeText(
+                                        context,
+                                        if (arquivo != null) "Planilha salva em ${arquivo.parent}" else "Falha ao gerar a planilha.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                mostrarDialogExportar = false
+                            }) {
+                                Text("Exportar")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { mostrarDialogExportar = false }) {
+                                Text("Cancelar")
+                            }
+                        }
+                    )
+                }
+
                 if (mostrarDialogSair) {
                     AlertDialog(
                         onDismissRequest = { mostrarDialogSair = false },
@@ -204,7 +248,6 @@ fun TelaPrincipal(
                                 scope.launch {
                                     val usuarioPromovido = usuario.copy(tipo = TipoUsuario.ADMIN)
                                     usuarioRepository.atualizarUsuario(usuarioPromovido)
-                                    // --- CORREÇÃO 2: Chamar a função sem argumentos ---
                                     authViewModel.recarregarUsuario()
                                     LogHelper.registrarGerenciamentoUsuario(
                                         context = context, usuarioResponsavel = "SISTEMA", acao = "PROMOÇÃO ADM",
@@ -231,39 +274,75 @@ fun TelaPrincipal(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FeatureCard(
-    title: String, subtitle: String, icon: ImageVector, color: Color, onClick: () -> Unit
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    color: Color,
+    description: String,
+    onClick: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    val rotationAngle by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rotation")
+
     Card(
-        onClick = onClick,
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(Dimens.PaddingMedium)
-        ) {
-            Box(
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(color.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+                    .clickable(onClick = onClick)
+                    .padding(Dimens.PaddingMedium)
             ) {
-                Icon(
-                    icon,
-                    contentDescription = title,
-                    tint = color,
-                    modifier = Modifier.size(Dimens.IconSizeLarge)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = title,
+                        tint = color,
+                        modifier = Modifier.size(Dimens.IconSizeLarge)
+                    )
+                }
+                Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = title, style = MaterialTheme.typography.titleLarge)
+                    Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        Icons.Default.ExpandMore,
+                        contentDescription = "Expandir",
+                        tint = RktTextSecondary,
+                        modifier = Modifier.rotate(rotationAngle)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.titleLarge)
-                Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column {
+                    Divider(modifier = Modifier.padding(horizontal = Dimens.PaddingMedium), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = RktTextSecondary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Dimens.PaddingMedium)
+                    )
+                }
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = RktTextSecondary)
         }
     }
 }
