@@ -3,21 +3,22 @@ package com.example.rktec_middleware.ui.screens
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rktec_middleware.data.model.TipoUsuario
@@ -120,8 +121,12 @@ private fun UsuarioCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingExtraSmall)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            // Deixa o card mais escuro se o usuário estiver inativo
+            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (usuario.ativo) Dimens.PaddingExtraSmall else 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -136,19 +141,19 @@ private fun UsuarioCard(
                 Text(usuario.email, style = MaterialTheme.typography.bodyMedium)
                 Text(
                     text = if (usuario.tipo == TipoUsuario.ADMIN) "Administrador" else "Membro",
-                    color = if (usuario.tipo == TipoUsuario.ADMIN) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
+                    color = if (usuario.tipo == TipoUsuario.ADMIN) RktOrange else MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
             }
             Row {
-                IconButton(onClick = { onEditClick(usuario) }) {
-                    Icon(Icons.Default.Edit, "Editar", tint = RktTextSecondary)
+                IconButton(onClick = { onEditClick(usuario) }, enabled = usuario.ativo) {
+                    Icon(Icons.Default.Edit, "Editar", tint = if(usuario.ativo) RktTextSecondary else RktTextSecondary.copy(alpha = 0.5f))
                 }
                 if (!isSelf) {
                     IconButton(onClick = { onDeleteClick(usuario) }) {
                         Icon(
-                            Icons.Default.Delete,
+                            imageVector = if (usuario.ativo) Icons.Default.Delete else Icons.Default.Restore,
                             contentDescription = if (usuario.ativo) "Desativar" else "Reativar",
                             tint = if (usuario.ativo) RktRed else RktGreen
                         )
@@ -170,14 +175,18 @@ private fun UserAvatar(name: String, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = name.take(1).uppercase(),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            style = MaterialTheme.typography.headlineMedium
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
         )
     }
 }
 
-// Adicionar ao final do arquivo TelaGerenciamentoUsuarios.kt
+// -----------------------------------------------------------------------------------
+// ALTERAÇÃO: Todos os diálogos abaixo foram refeitos com um estilo mais moderno e legível.
+// -----------------------------------------------------------------------------------
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogEditarUsuario(
     usuario: Usuario,
@@ -189,30 +198,31 @@ private fun DialogEditarUsuario(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Editar Usuário", style = MaterialTheme.typography.headlineSmall) },
+        icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+        title = { Text("Editar Usuário") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)) {
+                // Campo de nome
                 StandardTextField(
                     value = nomeEditado,
                     onValueChange = { nomeEditado = it },
                     label = "Nome"
                 )
+
+                // Campo de e-mail (não editável)
                 StandardTextField(
                     value = usuario.email,
                     onValueChange = {},
                     label = "Email",
                     enabled = false
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
-                ) {
-                    Text("Tipo:", style = MaterialTheme.typography.bodyLarge)
-                    DropdownMenuTipoUsuario(
-                        value = tipoEditado,
-                        onValueChange = { tipoEditado = it }
-                    )
-                }
+
+                // Dropdown para tipo de usuário (com novo visual)
+                DropdownMenuTipoUsuario(
+                    label = "Tipo de Usuário",
+                    value = tipoEditado,
+                    onValueChange = { tipoEditado = it }
+                )
             }
         },
         confirmButton = {
@@ -227,8 +237,7 @@ private fun DialogEditarUsuario(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
         },
-        shape = MaterialTheme.shapes.large,
-        containerColor = MaterialTheme.colorScheme.surface
+        shape = MaterialTheme.shapes.large
     )
 }
 
@@ -238,8 +247,11 @@ private fun DialogExcluirUsuario(
     onConfirm: (Usuario, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var motivoExclusao by remember { mutableStateOf("") }
     val isAtivo = usuario.ativo
+    val (selectedOption, onOptionSelected) = remember { mutableStateOf("") }
+    var outroMotivo by remember { mutableStateOf("") }
+
+    val motivoFinal = if (selectedOption == "Outros") outroMotivo else selectedOption
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -250,24 +262,30 @@ private fun DialogExcluirUsuario(
                 Text(if (isAtivo) "Tem certeza que deseja desativar o usuário ${usuario.nome}?" else "Deseja reativar o usuário ${usuario.nome}?")
                 if (isAtivo) {
                     Spacer(Modifier.height(Dimens.PaddingMedium))
-                    Text("Motivo:", fontWeight = FontWeight.SemiBold)
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = motivoExclusao == "Desligamento de usuário", onClick = { motivoExclusao = "Desligamento de usuário" })
-                            Text("Desligamento de usuário")
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = motivoExclusao == "Outros", onClick = { motivoExclusao = "Outros" })
-                            Text("Outros")
-                        }
+                    Text("Motivo:", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+
+                    // Radio buttons mais interativos
+                    Column(Modifier.selectableGroup()) {
+                        SelectableRow("Desligamento de usuário", selectedOption, onOptionSelected)
+                        SelectableRow("Outros", selectedOption, onOptionSelected)
+                    }
+
+                    // Campo de texto que aparece se "Outros" for selecionado
+                    AnimatedVisibility(visible = selectedOption == "Outros") {
+                        StandardTextField(
+                            value = outroMotivo,
+                            onValueChange = { outroMotivo = it },
+                            label = "Especifique o motivo",
+                            modifier = Modifier.padding(top = Dimens.PaddingSmall)
+                        )
                     }
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(usuario, motivoExclusao) },
-                enabled = !isAtivo || motivoExclusao.isNotBlank(),
+                onClick = { onConfirm(usuario, motivoFinal) },
+                enabled = !isAtivo || motivoFinal.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = if (isAtivo) RktRed else RktGreen)
             ) {
                 Text(if (isAtivo) "Desativar" else "Reativar")
@@ -281,23 +299,78 @@ private fun DialogExcluirUsuario(
 }
 
 @Composable
+private fun SelectableRow(
+    text: String,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .selectable(
+                selected = (text == selectedOption),
+                onClick = { onOptionSelected(text) },
+                role = Role.RadioButton
+            )
+            .padding(horizontal = Dimens.PaddingSmall),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = (text == selectedOption),
+            onClick = null // O clique é controlado pela Row
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = Dimens.PaddingSmall)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun DropdownMenuTipoUsuario(
+    label: String,
     value: TipoUsuario,
     onValueChange: (TipoUsuario) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            shape = MaterialTheme.shapes.small
+    val displayText = if (value == TipoUsuario.ADMIN) "Administrador" else "Membro"
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = displayText,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            shape = MaterialTheme.shapes.medium,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = RktStroke
+            )
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
         ) {
-            Text(if (value == TipoUsuario.ADMIN) "Administrador" else "Membro")
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             TipoUsuario.values().forEach { tipo ->
                 DropdownMenuItem(
-                    text = { Text(if (tipo == TipoUsuario.ADMIN) "Administrador" else "Membro") },
+                    text = {
+                        Text(
+                            text = if (tipo == TipoUsuario.ADMIN) "Administrador" else "Membro",
+                            fontWeight = if (tipo == value) FontWeight.Bold else FontWeight.Normal,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
                     onClick = {
                         onValueChange(tipo)
                         expanded = false

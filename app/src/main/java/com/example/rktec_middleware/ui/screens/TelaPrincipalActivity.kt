@@ -49,7 +49,6 @@ fun TelaPrincipal(
     usuarioRepository: UsuarioRepository,
     onInventarioClick: () -> Unit,
     onChecagemClick: () -> Unit,
-    onDebugClick: () -> Unit,
     onSobreClick: () -> Unit,
     onSairClick: () -> Unit,
     onGerenciarUsuariosClick: () -> Unit
@@ -74,12 +73,16 @@ fun TelaPrincipal(
                 CircularProgressIndicator()
             }
         } else {
+            // O Box que continha o gesto foi movido para a MainActivity
             Box(modifier = Modifier.fillMaxSize()) {
+                // A Column principal agora engloba TODO o conteúdo (inclusive o footer)
+                // e é a responsável pela rolagem.
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        .verticalScroll(rememberScrollState()) // A tela inteira continua rolável
+                        // O MODIFICADOR POINTERINPUT FOI REMOVIDO DAQUI
+                        .verticalScroll(rememberScrollState())
                 ) {
                     // Header
                     Box(
@@ -98,9 +101,13 @@ fun TelaPrincipal(
                             Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
                             Column {
                                 Text("Bem-vindo!", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f)))
-                                Text(usuario.nome, style = MaterialTheme.typography.headlineMedium.copy(color = Color.White))
+                                Text(
+                                    usuario.nome.split(" ").first(), // Pega só o primeiro nome
+                                    style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
+                                    maxLines = 1,
+                                )
                             }
-                            Spacer(modifier = Modifier.weight(1f))
+                            Spacer(modifier = Modifier.weight(1f)) // Empurra o botão de sair para o final
                             IconButton(
                                 onClick = { mostrarDialogSair = true },
                                 modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
@@ -111,11 +118,10 @@ fun TelaPrincipal(
                     }
 
                     // Feature Cards
-                    // ALTERAÇÃO: O offset negativo foi adicionado de volta para criar o efeito de sobreposição.
                     Column(
                         Modifier
                             .fillMaxWidth()
-                            .offset(y = (-30).dp) // <-- EFEITO RESTAURADO
+                            .offset(y = (-30).dp)
                             .padding(horizontal = Dimens.PaddingLarge),
                         verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                     ) {
@@ -156,18 +162,15 @@ fun TelaPrincipal(
                         )
                     }
 
-                    // Footer
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Footer (Agora dentro da coluna rolável)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(Dimens.PaddingMedium),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (usuario.tipo == TipoUsuario.ADMIN) {
-                            TextButton(onClick = onDebugClick) {
-                                Text("Consulta e Edição de Itens", color = RktTextSecondary)
-                            }
-                        }
                         Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
                         Row(
                             horizontalArrangement = Arrangement.Center,

@@ -29,6 +29,7 @@ import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.viewmodel.RfidViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
+import com.example.rktec_middleware.ui.components.GradientHeader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -96,23 +97,7 @@ fun TelaChecagem(
 
     Scaffold(
         topBar = {
-            // O cabeçalho continua o mesmo
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            0f to MaterialTheme.colorScheme.primaryContainer,
-                            1f to MaterialTheme.colorScheme.primary
-                        )
-                    )
-            ) {
-                IconButton(onClick = onVoltar, modifier = Modifier.align(Alignment.CenterStart)) {
-                    Icon(Icons.Default.ArrowBack, "Voltar", tint = Color.White)
-                }
-                Text("Checagem e Localização", style = MaterialTheme.typography.titleLarge, color = Color.White, modifier = Modifier.align(Alignment.Center))
-            }
+            GradientHeader(title = "Checagem e Localização", onVoltar = onVoltar)
         }
     ) { paddingValues ->
         // ALTERAÇÃO: Layout unificado que se adapta ao estado, em vez de trocar a tela inteira.

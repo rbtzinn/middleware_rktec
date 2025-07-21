@@ -4,6 +4,7 @@ package com.example.rktec_middleware.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,7 +25,6 @@ import com.example.rktec_middleware.data.model.*
 import com.example.rktec_middleware.ui.components.InfoChip
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
-import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.ui.components.GradientHeader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,10 +45,17 @@ fun TelaDebug(
     var itemEditando by remember { mutableStateOf<ItemInventario?>(null) }
     val context = LocalContext.current
 
+    // Estado para guardar as listas de lojas e setores para os dropdowns
+    var listasParaDropdown by remember { mutableStateOf<Pair<List<String>, List<String>>>(Pair(emptyList(), emptyList())) }
+
     LaunchedEffect(refresh) {
         inventarioCompleto = withContext(Dispatchers.IO) {
             banco.inventarioDao().listarTodos()
         }
+        // Popula as listas para os dropdowns com valores únicos, limpos e ordenados
+        val lojas = inventarioCompleto.map { it.loja.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
+        val setores = inventarioCompleto.map { it.localizacao.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
+        listasParaDropdown = Pair(lojas, setores)
     }
 
     val inventarioFiltrado by remember(textoBusca, inventarioCompleto) {
@@ -87,7 +95,7 @@ fun TelaDebug(
                         Text(
                             "Total de itens: ${inventarioFiltrado.size} / ${inventarioCompleto.size}",
                             style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(Modifier.height(Dimens.PaddingSmall))
                         if (inventarioCompleto.isEmpty()) {
@@ -117,6 +125,8 @@ fun TelaDebug(
         if (itemEditando != null) {
             DialogEditarItemDebug(
                 item = itemEditando!!,
+                lojasDisponiveis = listasParaDropdown.first,
+                setoresDisponiveis = listasParaDropdown.second,
                 onDismiss = { itemEditando = null },
                 onConfirm = { itemAtualizado ->
                     scope.launch {
@@ -147,9 +157,8 @@ fun TelaDebug(
                         onClick = {
                             mostrarDialogLimparBanco = false
                             scope.launch {
-                                // CORREÇÃO APLICADA AQUI
                                 withContext(Dispatchers.IO) {
-                                    banco.inventarioDao().limparInventario()  // Executando em segundo plano
+                                    banco.inventarioDao().limparInventario()
                                 }
                                 onBancoLimpo()
                                 Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
@@ -168,14 +177,15 @@ private fun ItemDebugCard(item: ItemInventario, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Column(Modifier.padding(Dimens.PaddingMedium)) {
-            Text(text = item.desc.ifBlank { "Item sem descrição" }, style = MaterialTheme.typography.titleLarge)
-            Text(text = item.tag, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
+            Text(text = item.desc.ifBlank { "Item sem descrição" }, style = MaterialTheme.typography.titleMedium)
+            Text(text = item.tag, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(Dimens.PaddingSmall))
-            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall), verticalAlignment = Alignment.CenterVertically) {
                 if (item.loja.isNotBlank()) InfoChip("Loja: ${item.loja}")
                 if (item.localizacao.isNotBlank()) InfoChip("Setor: ${item.localizacao}")
             }
@@ -194,20 +204,51 @@ private fun ItemDebugCard(item: ItemInventario, onClick: () -> Unit) {
 
 
 @Composable
-private fun DialogEditarItemDebug(item: ItemInventario, onConfirm: (ItemInventario) -> Unit, onDismiss: () -> Unit) {
+private fun DialogEditarItemDebug(
+    item: ItemInventario,
+    lojasDisponiveis: List<String>,
+    setoresDisponiveis: List<String>,
+    onConfirm: (ItemInventario) -> Unit,
+    onDismiss: () -> Unit
+) {
     var desc by remember { mutableStateOf(item.desc) }
     var setor by remember { mutableStateOf(item.localizacao) }
     var loja by remember { mutableStateOf(item.loja) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Edit, contentDescription = "Editar Item") },
         title = { Text("Editar Item") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
-                Text("EPC: ${item.tag}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                StandardTextField(value = desc, onValueChange = { desc = it }, label = "Nome/Descrição")
-                StandardTextField(value = setor, onValueChange = { setor = it }, label = "Setor")
-                StandardTextField(value = loja, onValueChange = { loja = it }, label = "Loja")
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)) {
+                Text(
+                    "EPC: ${item.tag}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Divider()
+                StandardTextField(
+                    value = desc,
+                    onValueChange = { desc = it },
+                    label = "Nome/Descrição"
+                )
+
+                // Dropdown para Lojas
+                DropdownEditavel(
+                    label = "Loja",
+                    opcoes = lojasDisponiveis,
+                    valorInicial = loja,
+                    onValorSelecionado = { loja = it }
+                )
+
+                // Dropdown para Setores
+                DropdownEditavel(
+                    label = "Setor",
+                    opcoes = setoresDisponiveis,
+                    valorInicial = setor,
+                    onValorSelecionado = { setor = it }
+                )
             }
         },
         confirmButton = {
@@ -215,6 +256,64 @@ private fun DialogEditarItemDebug(item: ItemInventario, onConfirm: (ItemInventar
                 onConfirm(item.copy(desc = desc, localizacao = setor, loja = loja))
             }) { Text("Salvar") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+        dismissButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Cancelar")
+            }
+        }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DropdownEditavel(
+    label: String,
+    opcoes: List<String>,
+    valorInicial: String,
+    onValorSelecionado: (String) -> Unit
+) {
+    var expandido by remember { mutableStateOf(false) }
+    var valorSelecionado by remember { mutableStateOf(valorInicial) }
+
+    ExposedDropdownMenuBox(
+        expanded = expandido,
+        onExpandedChange = { expandido = !expandido },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = valorSelecionado,
+            onValueChange = { },
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandido) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.Black,
+                unfocusedTextColor = Color.Black,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+            )
+        )
+        ExposedDropdownMenu(
+            expanded = expandido,
+            onDismissRequest = { expandido = false },
+            modifier = Modifier.background(Color.White).heightIn(max = 220.dp)
+        ) {
+            opcoes.forEach { opcao ->
+                DropdownMenuItem(
+                    text = { Text(opcao, color = Color.Black) },
+                    onClick = {
+                        valorSelecionado = opcao
+                        onValorSelecionado(opcao)
+                        expandido = false
+                    }
+                )
+            }
+        }
+    }
 }

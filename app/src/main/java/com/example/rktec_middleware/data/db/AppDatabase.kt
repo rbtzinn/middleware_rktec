@@ -32,7 +32,7 @@ import com.example.rktec_middleware.data.dao.UsuarioDao
         LogEdicaoItem::class
     ],
     // MODIFICADO: Versão incrementada de 12 para 13 devido à mudança na estrutura.
-    version = 13
+    version = 14
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao

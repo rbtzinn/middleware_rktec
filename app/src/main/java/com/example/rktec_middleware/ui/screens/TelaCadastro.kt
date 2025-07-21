@@ -1,4 +1,3 @@
-// ui/screens/TelaCadastro.kt
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
@@ -65,7 +64,7 @@ fun TelaCadastro(
                 StandardTextField(
                     value = nome,
                     onValueChange = { nome = it },
-                    label = "Nome de usuário",
+                    label = "Nome completo",
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Nome de usuário") }
                 )
                 Spacer(Modifier.height(Dimens.PaddingMedium))
@@ -123,8 +122,10 @@ fun TelaCadastro(
                                 mostrarErro = "A senha deve conter pelo menos uma letra."
                             senha != confirmacao ->
                                 mostrarErro = "As senhas não conferem!"
-                            else ->
-                                cadastroViewModel.cadastrar(nome.trim(), email.trim(), senha)
+                            else -> {
+                                val primeiroNome = nome.trim().split(" ").first()
+                                cadastroViewModel.cadastrar(primeiroNome, email.trim(), senha)
+                            }
                         }
                     },
                     text = "Cadastrar",
