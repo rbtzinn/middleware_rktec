@@ -11,7 +11,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -73,7 +75,12 @@ fun TelaPrincipal(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .verticalScroll(rememberScrollState()) // A tela inteira continua rolável
+                ) {
                     // Header
                     Box(
                         modifier = Modifier.fillMaxWidth().height(140.dp).background(
@@ -104,8 +111,12 @@ fun TelaPrincipal(
                     }
 
                     // Feature Cards
+                    // ALTERAÇÃO: O offset negativo foi adicionado de volta para criar o efeito de sobreposição.
                     Column(
-                        Modifier.fillMaxWidth().offset(y = (-30).dp).padding(horizontal = Dimens.PaddingLarge),
+                        Modifier
+                            .fillMaxWidth()
+                            .offset(y = (-30).dp) // <-- EFEITO RESTAURADO
+                            .padding(horizontal = Dimens.PaddingLarge),
                         verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                     ) {
                         FeatureCard(
@@ -144,9 +155,6 @@ fun TelaPrincipal(
                             description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados."
                         )
                     }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
 
                     // Footer
                     Column(
