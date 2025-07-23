@@ -1,4 +1,3 @@
-// viewmodel/RfidViewModel.kt
 package com.example.rktec_middleware.viewmodel
 
 import android.content.Context
@@ -7,12 +6,20 @@ import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.data.model.RfidScanEvent
 import com.example.rktec_middleware.service.RfidService
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class RfidViewModel(context: Context) : ViewModel() {
+@HiltViewModel // Anotação principal
+class RfidViewModel @Inject constructor( // Injeção no construtor
+    @ApplicationContext context: Context // Hilt provê o contexto automaticamente
+) : ViewModel() {
+
+    // O corpo da classe permanece exatamente o mesmo
     private val service = RfidService(context)
     private val _tagList = MutableStateFlow<List<EpcTag>>(emptyList())
     val tagList: StateFlow<List<EpcTag>> get() = _tagList

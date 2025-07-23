@@ -1,8 +1,6 @@
 package com.example.rktec_middleware.ui.screens
 
-import android.content.Context
 import android.net.Uri
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,18 +14,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.ItemInventario
-import com.example.rktec_middleware.data.model.MapeamentoPlanilha
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.components.SecondaryTextButton
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LeitorInventario
-import kotlinx.coroutines.CoroutineScope
+import com.example.rktec_middleware.viewmodel.MapeamentoState
+import com.example.rktec_middleware.viewmodel.MapeamentoViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,29 +31,45 @@ fun TelaMapeamentoPlanilha(
     uri: Uri,
     usuarioLogado: String,
     onSalvar: (totalItens: Int) -> Unit,
-    onCancelar: () -> Unit
+    onCancelar: () -> Unit,
+    viewModel: MapeamentoViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var dadosBrutos by remember { mutableStateOf<Pair<List<String>, List<List<String>>>?>(null) }
     var indexEpc by remember { mutableStateOf<Int?>(null) }
     var indexNome by remember { mutableStateOf<Int?>(null) }
     var indexSetor by remember { mutableStateOf<Int?>(null) }
     var indexLoja by remember { mutableStateOf<Int?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isReadingFile by remember { mutableStateOf(true) }
+
+    val mapeamentoState by viewModel.mapeamentoState.collectAsState()
 
     LaunchedEffect(uri) {
         withContext(Dispatchers.IO) {
             dadosBrutos = LeitorInventario.lerDadosBrutosDaPlanilha(context, uri)
         }
-        isLoading = false
+        isReadingFile = false
         if (dadosBrutos == null) {
             Toast.makeText(context, "Erro ao ler o arquivo ou formato não suportado.", Toast.LENGTH_LONG).show()
             onCancelar()
         }
     }
 
+    LaunchedEffect(mapeamentoState) {
+        when(val state = mapeamentoState) {
+            is MapeamentoState.Success -> {
+                Toast.makeText(context, "${state.totalItens} itens importados com sucesso!", Toast.LENGTH_SHORT).show()
+                onSalvar(state.totalItens)
+            }
+            is MapeamentoState.Error -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+            }
+            else -> {}
+        }
+    }
+
     val colunas = dadosBrutos?.first ?: emptyList()
+    val isLoading = isReadingFile || mapeamentoState is MapeamentoState.Loading
 
     RKTecMiddlewareTheme {
         Scaffold(
@@ -71,9 +83,10 @@ fun TelaMapeamentoPlanilha(
                 )
             }
         ) { innerPadding ->
-            if (isLoading) {
+            if (isReadingFile) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
+                    Text("Lendo arquivo...", modifier = Modifier.padding(top = 80.dp))
                 }
             } else {
                 Column(
@@ -108,13 +121,14 @@ fun TelaMapeamentoPlanilha(
                     Column(Modifier.padding(Dimens.PaddingMedium), horizontalAlignment = Alignment.CenterHorizontally) {
                         PrimaryButton(
                             onClick = {
-                                isLoading = true
-                                processarEsalvarDados(context, scope, usuarioLogado, uri, dadosBrutos, indexEpc, indexNome, indexSetor, indexLoja,
-                                    onSucesso = { total ->
-                                        isLoading = false
-                                        onSalvar(total)
-                                    },
-                                    onError = { isLoading = false }
+                                viewModel.processarEsalvarDados(
+                                    usuario = usuarioLogado,
+                                    uri = uri,
+                                    dadosBrutos = dadosBrutos,
+                                    indexEpc = indexEpc,
+                                    indexNome = indexNome,
+                                    indexSetor = indexSetor,
+                                    indexLoja = indexLoja
                                 )
                             },
                             text = if (isLoading) "Processando..." else "Confirmar e Importar",
@@ -197,81 +211,6 @@ private fun CampoMapeamento(
                         }
                     )
                 }
-            }
-        }
-    }
-}
-
-private fun processarEsalvarDados(
-    context: Context, scope: CoroutineScope, usuario: String, uri: Uri,
-    dadosBrutos: Pair<List<String>, List<List<String>>>?,
-    indexEpc: Int?, indexNome: Int?, indexSetor: Int?, indexLoja: Int?,
-    onSucesso: (totalItens: Int) -> Unit, onError: () -> Unit
-) {
-    if (indexEpc == null || dadosBrutos == null) {
-        Toast.makeText(context, "A coluna EPC é obrigatória e os dados devem ser válidos.", Toast.LENGTH_SHORT).show()
-        onError()
-        return
-    }
-
-    scope.launch(Dispatchers.IO) {
-        try {
-            val cabecalho = dadosBrutos.first
-            val linhas = dadosBrutos.second
-
-            val mapeamento = MapeamentoPlanilha(
-                usuario = usuario,
-                nomeArquivo = uri.lastPathSegment ?: "desconhecido",
-                colunaEpc = indexEpc,
-                colunaNome = indexNome,
-                colunaSetor = indexSetor,
-                colunaLoja = indexLoja
-            )
-
-            val indicesMapeados = listOfNotNull(indexEpc, indexNome, indexSetor, indexLoja)
-            val listaItens = linhas.mapNotNull { linha ->
-                val tag = linha.getOrNull(indexEpc)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-
-                val desc = indexNome?.let { linha.getOrNull(it) } ?: ""
-                val setor = indexSetor?.let { linha.getOrNull(it) } ?: ""
-                val loja = indexLoja?.let { linha.getOrNull(it) } ?: ""
-
-                val colunasExtras = mutableMapOf<String, String>()
-                cabecalho.forEachIndexed { index, nomeColuna ->
-                    if (index !in indicesMapeados) {
-                        colunasExtras[nomeColuna] = linha.getOrNull(index) ?: ""
-                    }
-                }
-                ItemInventario(tag, desc, setor, loja, colunasExtras)
-            }
-
-            if (listaItens.isEmpty()) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Nenhum item válido encontrado na planilha.", Toast.LENGTH_LONG).show()
-                }
-                onError()
-                return@launch
-            }
-
-            val db = AppDatabase.getInstance(context)
-            db.inventarioDao().limparInventario()
-            db.inventarioDao().inserirTodos(listaItens)
-
-            val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
-            prefs.edit().putString("cabecalho_original", JSONArray(cabecalho).toString()).apply()
-
-            db.mapeamentoDao().deletarTudo()
-            db.mapeamentoDao().inserir(mapeamento)
-
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "${listaItens.size} itens importados com sucesso!", Toast.LENGTH_SHORT).show()
-                onSucesso(listaItens.size)
-            }
-        } catch (e: Exception) {
-            Log.e("ProcessarDados", "Erro na importação", e)
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Falha na importação: ${e.message}", Toast.LENGTH_LONG).show()
-                onError()
             }
         }
     }

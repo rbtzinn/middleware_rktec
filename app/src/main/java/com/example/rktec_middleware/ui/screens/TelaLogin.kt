@@ -1,4 +1,3 @@
-// ui/screens/TelaLogin.kt
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
@@ -13,25 +12,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.example.rktec_middleware.data.db.AppDatabase
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.ui.components.*
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.viewmodel.LoginState
 import com.example.rktec_middleware.viewmodel.LoginViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @Composable
 fun TelaLogin(
     onLoginSucesso: (Usuario) -> Unit,
     onEsqueciSenha: (String) -> Unit,
     onIrParaCadastro: () -> Unit,
-    viewModel: LoginViewModel
+    viewModel: LoginViewModel = hiltViewModel()
 ) {
     val loginState by viewModel.loginState.collectAsState()
     var usuario by remember { mutableStateOf("") }
@@ -39,16 +35,11 @@ fun TelaLogin(
     var senhaVisivel by remember { mutableStateOf(false) }
     var showSuggestions by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
-    val appDatabase = remember { AppDatabase.getInstance(context) }
-    var emailsCadastrados by remember { mutableStateOf<List<String>>(emptyList()) }
-    val scope = rememberCoroutineScope()
+    val emailsCadastrados by viewModel.sugestoesEmail.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.resetarEstado()
-        scope.launch(Dispatchers.IO) {
-            emailsCadastrados = appDatabase.usuarioDao().listarEmails()
-        }
+        viewModel.carregarSugestoesDeEmail()
     }
 
     val filteredSuggestions = emailsCadastrados.filter {
@@ -83,7 +74,6 @@ fun TelaLogin(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // AUTOCOMPLETE
                 Box {
                     StandardTextField(
                         value = usuario,
@@ -98,7 +88,7 @@ fun TelaLogin(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 60.dp), // Ajuste conforme necessário
+                                .padding(top = 60.dp),
                             shape = MaterialTheme.shapes.medium,
                             elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingSmall)
                         ) {

@@ -13,28 +13,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.rktec_middleware.data.db.AppDatabase
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.ui.components.GradientHeader
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
+import com.example.rktec_middleware.viewmodel.ChecagemViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModel
-import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
-import com.example.rktec_middleware.ui.components.GradientHeader
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-// O enum e as funções de ajuda continuam os mesmos
 private enum class StatusChecagem {
     AGUARDANDO_INPUT,
     ITEM_NAO_ENCONTRADO_NA_BASE,
@@ -60,25 +52,28 @@ private var ItemInventario.rssi: Float by mutableStateOf(0f)
 @Composable
 fun TelaChecagem(
     onVoltar: () -> Unit,
-    banco: AppDatabase
+    rfidViewModel: RfidViewModel = hiltViewModel(),
+    checagemViewModel: ChecagemViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
-    val viewModelFactory = RfidViewModelFactory(context)
-    val viewModel: RfidViewModel = viewModel(factory = viewModelFactory)
-    val scope = rememberCoroutineScope()
-
     var epcParaChecar by remember { mutableStateOf("") }
     var status by remember { mutableStateOf(StatusChecagem.AGUARDANDO_INPUT) }
-    var itemDaBase by remember { mutableStateOf<ItemInventario?>(null) }
-    val scanEvent by viewModel.scanEvent.collectAsState()
 
-    // A lógica principal continua a mesma
+    val itemDaBase by checagemViewModel.itemDaBase.collectAsState()
+    val buscaConcluida by checagemViewModel.buscaConcluida.collectAsState()
+    val scanEvent by rfidViewModel.scanEvent.collectAsState()
+
+    LaunchedEffect(buscaConcluida) {
+        if (buscaConcluida) {
+            status = if (itemDaBase != null) StatusChecagem.AGUARDANDO_LEITURA_FISICA else StatusChecagem.ITEM_NAO_ENCONTRADO_NA_BASE
+        }
+    }
+
     LaunchedEffect(status, scanEvent) {
         val evento = scanEvent
         if (evento != null && evento.epc == epcParaChecar) {
             if (status == StatusChecagem.AGUARDANDO_LEITURA_FISICA) {
                 status = StatusChecagem.ITEM_ENCONTRADO
-                viewModel.stopReading()
+                rfidViewModel.stopReading()
             }
             if (status == StatusChecagem.LOCALIZANDO) {
                 itemDaBase?.let {
@@ -90,8 +85,9 @@ fun TelaChecagem(
 
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.stopReading()
-            viewModel.limparTags()
+            rfidViewModel.stopReading()
+            rfidViewModel.limparTags()
+            checagemViewModel.resetar()
         }
     }
 
@@ -100,7 +96,6 @@ fun TelaChecagem(
             GradientHeader(title = "Checagem e Localização", onVoltar = onVoltar)
         }
     ) { paddingValues ->
-        // ALTERAÇÃO: Layout unificado que se adapta ao estado, em vez de trocar a tela inteira.
         Column(
             modifier = Modifier
                 .padding(paddingValues)
@@ -108,7 +103,6 @@ fun TelaChecagem(
                 .padding(Dimens.PaddingMedium),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // O campo de input some suavemente quando a busca começa.
             AnimatedVisibility(visible = status == StatusChecagem.AGUARDANDO_INPUT) {
                 InputSection(
                     epcValue = epcParaChecar,
@@ -116,7 +110,6 @@ fun TelaChecagem(
                 )
             }
 
-            // O espaço do meio agora é a área de status, que se anima e se transforma.
             Spacer(Modifier.height(Dimens.PaddingLarge))
             StatusSection(
                 status = status,
@@ -125,33 +118,26 @@ fun TelaChecagem(
             )
             Spacer(Modifier.weight(1f))
 
-            // A área de botões é fixa, mas os botões mudam conforme o estado.
             ActionsSection(
                 status = status,
                 epcParaChecar = epcParaChecar,
                 onVerificarClick = {
                     if (epcParaChecar.isNotBlank()) {
-                        scope.launch(Dispatchers.IO) {
-                            val item = banco.inventarioDao().buscarPorTag(epcParaChecar)
-                            withContext(Dispatchers.Main) {
-                                itemDaBase = item
-                                status = if (item != null) StatusChecagem.AGUARDANDO_LEITURA_FISICA else StatusChecagem.ITEM_NAO_ENCONTRADO_NA_BASE
-                            }
-                        }
+                        checagemViewModel.buscarItemPorTag(epcParaChecar)
                     }
                 },
                 onAtivarLocalizador = {
-                    viewModel.limparTags()
-                    viewModel.startReading()
+                    rfidViewModel.limparTags()
+                    rfidViewModel.startReading()
                     status = StatusChecagem.LOCALIZANDO
                 },
                 onPararBusca = {
-                    viewModel.stopReading()
+                    rfidViewModel.stopReading()
                     status = StatusChecagem.AGUARDANDO_LEITURA_FISICA
                 },
                 onResetClick = {
                     epcParaChecar = ""
-                    itemDaBase = null
+                    checagemViewModel.resetar()
                     status = StatusChecagem.AGUARDANDO_INPUT
                 }
             )

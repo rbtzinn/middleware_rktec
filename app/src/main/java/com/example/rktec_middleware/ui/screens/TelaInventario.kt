@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
@@ -15,25 +13,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.rktec_middleware.data.db.AppDatabase
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.ui.components.InfoChip
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.components.StandardDropdown
 import com.example.rktec_middleware.ui.theme.*
+import com.example.rktec_middleware.viewmodel.InventarioViewModel
 
-// NOVA VERSÃO - MAIS ROBUSTA
 private fun normalizarNome(nome: String): String {
     return nome
         .replace("\"", "")
         .trim()
         .uppercase()
 }
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaInventario(
     onVoltar: () -> Unit,
@@ -41,19 +39,13 @@ fun TelaInventario(
         filtroLoja: String?,
         filtroSetor: String?
     ) -> Unit,
-    onSobreClick: () -> Unit
+    onSobreClick: () -> Unit,
+    viewModel: InventarioViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
-    val db = remember { AppDatabase.getInstance(context) }
-    var dadosImportados by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+    val dadosImportados by viewModel.dadosImportados.collectAsState()
     var filtroLoja by remember { mutableStateOf<String?>(null) }
     var filtroSetor by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        dadosImportados = db.inventarioDao().listarTodos()
-    }
-
-    // ALTERAÇÃO 1: Normaliza os nomes das lojas antes de exibi-los no filtro.
     val lojasDisponiveis by remember(dadosImportados) {
         derivedStateOf {
             dadosImportados.map { normalizarNome(it.loja) }.filter { it.isNotBlank() }.distinct()
@@ -63,13 +55,11 @@ fun TelaInventario(
     val setoresDisponiveis by remember(filtroLoja, dadosImportados) {
         derivedStateOf {
             dadosImportados
-                // Garante que a comparação para filtrar os setores também use o nome normalizado.
                 .filter { item -> filtroLoja.isNullOrBlank() || normalizarNome(item.loja) == filtroLoja }
                 .map { it.localizacao.trim() }.filter { it.isNotBlank() }.distinct()
         }
     }
 
-    // A lista de itens a ser exibida, agora filtrando pelo nome da loja normalizado.
     val listaFiltrada = dadosImportados.filter { item ->
         (filtroLoja.isNullOrEmpty() || normalizarNome(item.loja) == filtroLoja) &&
                 (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
@@ -77,12 +67,10 @@ fun TelaInventario(
 
     RKTecMiddlewareTheme {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-
-            // -- CABEÇALHO --
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp) // Aumentei um pouco a altura para o card não cortar o título
+                    .height(100.dp)
                     .background(
                         Brush.verticalGradient(
                             0f to MaterialTheme.colorScheme.primaryContainer,
@@ -111,8 +99,6 @@ fun TelaInventario(
                 )
             }
 
-            // -- FILTROS --
-            // ALTERAÇÃO 2: Movido o Card de filtros para uma Column com offset negativo.
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -136,21 +122,21 @@ fun TelaInventario(
                         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
                             StandardDropdown(
                                 label = "Loja",
-                                options = listOf("Todos") + lojasDisponiveis, // Adiciona "Todos"
+                                options = listOf("Todos") + lojasDisponiveis,
                                 selectedOption = filtroLoja ?: "Todos",
                                 onOptionSelected = {
                                     filtroLoja = if (it == "Todos") null else it
-                                    filtroSetor = null // Reseta o setor ao mudar a loja
+                                    filtroSetor = null
                                 },
                                 modifier = Modifier.weight(1f)
                             )
                             StandardDropdown(
                                 label = "Setor",
-                                options = listOf("Todos") + setoresDisponiveis, // Adiciona "Todos"
+                                options = listOf("Todos") + setoresDisponiveis,
                                 selectedOption = filtroSetor ?: "Todos",
                                 onOptionSelected = { filtroSetor = if (it == "Todos") null else it },
                                 modifier = Modifier.weight(1f),
-                                enabled = !filtroLoja.isNullOrBlank() // Habilita se uma loja for selecionada
+                                enabled = !filtroLoja.isNullOrBlank()
                             )
                         }
                         Text(
@@ -166,8 +152,6 @@ fun TelaInventario(
                 }
             }
 
-
-            // -- LISTA DE ITENS --
             if (dadosImportados.isEmpty()) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text(
@@ -180,7 +164,6 @@ fun TelaInventario(
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(
-                        // Removido o padding de cima para o card de filtros ficar mais proximo
                         start = Dimens.PaddingMedium,
                         end = Dimens.PaddingMedium,
                         bottom = Dimens.PaddingMedium
@@ -193,7 +176,6 @@ fun TelaInventario(
                 }
             }
 
-            // -- BOTÃO E FOOTER --
             if (dadosImportados.isNotEmpty()) {
                 PrimaryButton(
                     onClick = {
@@ -222,6 +204,7 @@ fun TelaInventario(
     }
 }
 
+// A função ItemInventarioCard permanece a mesma.
 @Composable
 private fun ItemInventarioCard(item: ItemInventario) {
     Card(
@@ -247,7 +230,6 @@ private fun ItemInventarioCard(item: ItemInventario) {
                 Modifier.padding(top = Dimens.PaddingSmall),
                 horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
             ) {
-                // A exibição aqui continua a mesma, mas a lógica de filtro foi corrigida
                 if (item.loja.isNotBlank()) InfoChip("Loja: ${normalizarNome(item.loja)}")
                 if (item.localizacao.isNotBlank()) InfoChip("Setor: ${item.localizacao}")
             }

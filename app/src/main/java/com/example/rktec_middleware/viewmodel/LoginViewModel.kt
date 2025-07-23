@@ -22,6 +22,15 @@ class LoginViewModel(
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState
 
+    private val _sugestoesEmail = MutableStateFlow<List<String>>(emptyList())
+    val sugestoesEmail: StateFlow<List<String>> = _sugestoesEmail
+
+    fun carregarSugestoesDeEmail() {
+        viewModelScope.launch {
+            _sugestoesEmail.value = usuarioRepository.listarEmails()
+        }
+    }
+
     fun autenticar(email: String, senha: String) {
         _loginState.value = LoginState.Loading
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, senha)

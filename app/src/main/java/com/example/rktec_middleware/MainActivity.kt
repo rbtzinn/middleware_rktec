@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -16,13 +17,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-// import androidx.compose.ui.graphics.BlendMode.Companion.Screen // IMPORT INCORRETO REMOVIDO
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -30,23 +29,30 @@ import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.ui.screens.* // Import correto para a sua classe Screen
+import com.example.rktec_middleware.ui.screens.*
 import com.example.rktec_middleware.ui.theme.RKTecMiddlewareTheme
-import com.example.rktec_middleware.viewmodel.*
+import com.example.rktec_middleware.viewmodel.AuthState
+import com.example.rktec_middleware.viewmodel.AuthViewModel
+import com.example.rktec_middleware.viewmodel.RfidViewModel
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 import kotlin.math.roundToInt
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private lateinit var viewModel: RfidViewModel
+
+    @Inject
+    lateinit var appDatabase: AppDatabase
+    @Inject
+    lateinit var usuarioRepository: UsuarioRepository
+
+    private val rfidViewModel: RfidViewModel by viewModels()
     private var lendo = false
 
     @SuppressLint("UnusedBoxWithConstraintsScope")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewModel = ViewModelProvider(this, RfidViewModelFactory(applicationContext)).get(RfidViewModel::class.java)
-
-        val appDatabase = AppDatabase.getInstance(applicationContext)
-        val usuarioRepository = UsuarioRepository(appDatabase.usuarioDao())
 
         setContent {
             RKTecMiddlewareTheme {
@@ -54,7 +60,7 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
 
-                val authViewModel: AuthViewModel = viewModel(factory = AuthViewModelFactory(usuarioRepository))
+                val authViewModel: AuthViewModel = hiltViewModel()
                 val authState by authViewModel.authState.collectAsState()
 
                 LaunchedEffect(Unit) {
@@ -100,15 +106,11 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
 
-                                    var refreshDebug by remember { mutableStateOf(0) }
                                     TelaDebug(
-                                        banco = appDatabase,
-                                        refresh = refreshDebug,
                                         usuarioLogado = usuarioAutenticado.nome,
                                         onVoltar = closeDebugScreen,
                                         onBancoLimpo = {
                                             authViewModel.setMapeamentoConcluido(false)
-                                            refreshDebug++
                                         }
                                     )
 
@@ -142,9 +144,8 @@ class MainActivity : ComponentActivity() {
                                             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                                             .then(dragModifier)
                                     ) {
+                                        // CORREÇÃO: TelaPrincipal não precisa mais de usuarioDao e usuarioRepository
                                         TelaPrincipal(
-                                            usuarioDao = appDatabase.usuarioDao(),
-                                            usuarioRepository = usuarioRepository,
                                             authViewModel = authViewModel,
                                             onInventarioClick = { navController.navigate(Screen.Inventario.route) },
                                             onChecagemClick = { navController.navigate(Screen.Checagem.route) },
@@ -158,10 +159,11 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable(Screen.Checagem.route) {
-                                TelaChecagem(onVoltar = { navController.popBackStack() }, banco = appDatabase)
+                                // CORREÇÃO: TelaChecagem não precisa mais do parâmetro 'banco'.
+                                TelaChecagem(onVoltar = { navController.popBackStack() })
                             }
                             composable(Screen.ColetaAvulsa.route) {
-                                TelaLeituraColeta(viewModel = viewModel, onVoltar = { navController.popBackStack() })
+                                TelaLeituraColeta(viewModel = rfidViewModel, onVoltar = { navController.popBackStack() })
                             }
                             composable(Screen.Importacao.route) {
                                 TelaImportacao(
@@ -177,22 +179,17 @@ class MainActivity : ComponentActivity() {
                                 TelaInventario(
                                     onVoltar = { navController.popBackStack() },
                                     onIniciarLeituraInventario = { loja, setor ->
-                                        // CORREÇÃO: Usando a função createRoute para navegar
                                         navController.navigate(Screen.LeituraInventario.createRoute(loja, setor))
                                     },
                                     onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                 )
                             }
-                            // CORREÇÃO: Usando a rota e os argumentos definidos na classe Screen
-                            composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) { backStackEntry ->
-                                val loja = backStackEntry.arguments?.getString("filtroLoja")
-                                val setor = backStackEntry.arguments?.getString("filtroSetor")
+                            composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) {
+                                // CORREÇÃO: Não passa mais 'banco', 'filtroLoja' e 'filtroSetor'.
+                                // O LeituraInventarioViewModel obtém esses dados dos argumentos da rota.
                                 TelaLeituraInventario(
                                     onVoltar = { navController.popBackStack() },
-                                    banco = appDatabase,
-                                    usuarioLogado = usuarioAutenticado.nome,
-                                    filtroLoja = if (loja == "null") null else loja,
-                                    filtroSetor = if (setor == "null") null else setor
+                                    usuarioLogado = usuarioAutenticado.nome
                                 )
                             }
                             composable(Screen.Sobre.route) {
@@ -223,7 +220,7 @@ class MainActivity : ComponentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == 139 && !lendo) {
             lendo = true
-            viewModel.startReading()
+            rfidViewModel.startReading()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -232,7 +229,7 @@ class MainActivity : ComponentActivity() {
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == 139 && lendo) {
             lendo = false
-            viewModel.stopReading()
+            rfidViewModel.stopReading()
             return true
         }
         return super.onKeyUp(keyCode, event)

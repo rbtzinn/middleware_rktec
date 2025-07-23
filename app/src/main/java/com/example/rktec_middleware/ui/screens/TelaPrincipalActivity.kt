@@ -1,13 +1,8 @@
-// ui/screens/TelaPrincipalActivity.kt
 package com.example.rktec_middleware.ui.screens
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,36 +23,31 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.dao.UsuarioDao
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.TipoUsuario
-import com.example.rktec_middleware.data.model.Usuario
-import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.components.AvatarComGestoSecreto
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
 import com.example.rktec_middleware.viewmodel.AuthViewModel
 import com.example.rktec_middleware.viewmodel.AuthState
+import com.example.rktec_middleware.viewmodel.ExportResult
+import com.example.rktec_middleware.viewmodel.TelaPrincipalViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun TelaPrincipal(
-    usuarioDao: UsuarioDao,
     authViewModel: AuthViewModel,
     onColetaAvulsaClick: () -> Unit,
-    usuarioRepository: UsuarioRepository,
     onInventarioClick: () -> Unit,
     onChecagemClick: () -> Unit,
     onSobreClick: () -> Unit,
     onSairClick: () -> Unit,
-    onGerenciarUsuariosClick: () -> Unit
+    onGerenciarUsuariosClick: () -> Unit,
+    telaPrincipalViewModel: TelaPrincipalViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.authState.collectAsState()
-    var usuario: Usuario? = null
-    if (authState is AuthState.Autenticado) {
-        usuario = (authState as AuthState.Autenticado).usuario
-    }
+    val usuario = (authState as? AuthState.Autenticado)?.usuario
 
     var mostrarDialogSair by remember { mutableStateOf(false) }
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
@@ -65,7 +55,15 @@ fun TelaPrincipal(
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val appDatabase = AppDatabase.getInstance(context)
+
+    LaunchedEffect(Unit) {
+        telaPrincipalViewModel.exportResult.collect { result ->
+            when(result) {
+                is ExportResult.Success -> Toast.makeText(context, "Planilha salva em ${result.file.parent}", Toast.LENGTH_LONG).show()
+                is ExportResult.Error -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     RKTecMiddlewareTheme {
         if (usuario == null) {
@@ -73,18 +71,14 @@ fun TelaPrincipal(
                 CircularProgressIndicator()
             }
         } else {
-            // O Box que continha o gesto foi movido para a MainActivity
             Box(modifier = Modifier.fillMaxSize()) {
-                // A Column principal agora engloba TODO o conteúdo (inclusive o footer)
-                // e é a responsável pela rolagem.
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        // O MODIFICADOR POINTERINPUT FOI REMOVIDO DAQUI
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Header
+                    // Header (sem alterações)
                     Box(
                         modifier = Modifier.fillMaxWidth().height(140.dp).background(
                             Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer, 1f to MaterialTheme.colorScheme.primary)
@@ -102,12 +96,12 @@ fun TelaPrincipal(
                             Column {
                                 Text("Bem-vindo!", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f)))
                                 Text(
-                                    usuario.nome.split(" ").first(), // Pega só o primeiro nome
+                                    usuario.nome.split(" ").first(),
                                     style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
                                     maxLines = 1,
                                 )
                             }
-                            Spacer(modifier = Modifier.weight(1f)) // Empurra o botão de sair para o final
+                            Spacer(modifier = Modifier.weight(1f))
                             IconButton(
                                 onClick = { mostrarDialogSair = true },
                                 modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
@@ -117,7 +111,7 @@ fun TelaPrincipal(
                         }
                     }
 
-                    // Feature Cards
+                    // Feature Cards (sem alterações)
                     Column(
                         Modifier
                             .fillMaxWidth()
@@ -125,46 +119,15 @@ fun TelaPrincipal(
                             .padding(horizontal = Dimens.PaddingLarge),
                         verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                     ) {
-                        FeatureCard(
-                            title = "Inventário",
-                            subtitle = "Controle e acompanhe o estoque",
-                            icon = Icons.Default.ListAlt,
-                            color = RktGreen,
-                            onClick = onInventarioClick,
-                            description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas."
-                        )
-
-                        FeatureCard(
-                            title = "Checagem de Item",
-                            subtitle = "Verifique uma única etiqueta",
-                            icon = Icons.Default.QrCodeScanner,
-                            color = RktBlueInfo,
-                            onClick = onChecagemClick,
-                            description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente."
-                        )
-
-                        FeatureCard(
-                            title = "Coleta Avulsa",
-                            subtitle = "Leia tags sem um inventário prévio",
-                            icon = Icons.Default.DocumentScanner,
-                            color = RktOrange,
-                            onClick = onColetaAvulsaClick,
-                            description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa."
-                        )
-
-                        FeatureCard(
-                            title = "Exportar Planilha Final",
-                            subtitle = "Gera o relatório mestre com os dados",
-                            icon = Icons.Default.UploadFile,
-                            color = RktBlueInfo,
-                            onClick = { mostrarDialogExportar = true },
-                            description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados."
-                        )
+                        FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
+                        FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
+                        FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
+                        FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Footer (Agora dentro da coluna rolável)
+                    // Footer (sem alterações)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -172,31 +135,15 @@ fun TelaPrincipal(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
                             TextButton(onClick = onSobreClick) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Sobre",
-                                    tint = RktGreen,
-                                    modifier = Modifier.size(Dimens.IconSizeSmall)
-                                )
+                                Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", tint = RktGreen, modifier = Modifier.size(Dimens.IconSizeSmall))
                                 Spacer(Modifier.width(Dimens.PaddingSmall))
                                 Text("Sobre o Sistema", color = RktGreen, fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        Text(
-                            "RKTECNOLOGIAS",
-                            fontWeight = FontWeight.Bold,
-                            color = RktGreen,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            "Todos os direitos reservados",
-                            style = MaterialTheme.typography.labelMedium
-                        )
+                        Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
+                        Text("Todos os direitos reservados", style = MaterialTheme.typography.labelMedium)
                     }
                 }
 
@@ -220,25 +167,12 @@ fun TelaPrincipal(
                         text = { Text("Deseja realmente gerar a planilha final com todos os dados do inventário?") },
                         confirmButton = {
                             Button(onClick = {
-                                scope.launch {
-                                    Toast.makeText(context, "Gerando planilha final...", Toast.LENGTH_SHORT).show()
-                                    val arquivo = LogHelper.exportarPlanilhaCompleta(context, appDatabase)
-                                    Toast.makeText(
-                                        context,
-                                        if (arquivo != null) "Planilha salva em ${arquivo.parent}" else "Falha ao gerar a planilha.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
+                                Toast.makeText(context, "Gerando planilha final...", Toast.LENGTH_SHORT).show()
+                                telaPrincipalViewModel.exportarPlanilhaCompleta()
                                 mostrarDialogExportar = false
-                            }) {
-                                Text("Exportar")
-                            }
+                            }) { Text("Exportar") }
                         },
-                        dismissButton = {
-                            TextButton(onClick = { mostrarDialogExportar = false }) {
-                                Text("Cancelar")
-                            }
-                        }
+                        dismissButton = { TextButton(onClick = { mostrarDialogExportar = false }) { Text("Cancelar") } }
                     )
                 }
 
@@ -256,17 +190,13 @@ fun TelaPrincipal(
                     DialogPromoverAdmin(
                         onConfirmar = { codigoDigitado ->
                             if (codigoDigitado == "@DM2025") {
-                                scope.launch {
-                                    val usuarioPromovido = usuario.copy(tipo = TipoUsuario.ADMIN)
-                                    usuarioRepository.atualizarUsuario(usuarioPromovido)
-                                    authViewModel.recarregarUsuario()
-                                    LogHelper.registrarGerenciamentoUsuario(
-                                        context = context, usuarioResponsavel = "SISTEMA", acao = "PROMOÇÃO ADM",
-                                        usuarioAlvo = usuario.email, motivo = "Promoção via código secreto",
-                                        detalhes = "Usuário promovido a ADMIN pelo código secreto."
-                                    )
-                                    Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
-                                    mostrarDialogAdmin = false
+                                telaPrincipalViewModel.promoverParaAdmin(usuario) {
+                                    scope.launch {
+                                        authViewModel.recarregarUsuario()
+                                        LogHelper.registrarGerenciamentoUsuario(context, "SISTEMA", "PROMOÇÃO ADM", usuario.email, "Promoção via código secreto", "Usuário promovido a ADMIN pelo código secreto.")
+                                        Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
+                                        mostrarDialogAdmin = false
+                                    }
                                 }
                                 return@DialogPromoverAdmin true
                             } else {
@@ -280,7 +210,6 @@ fun TelaPrincipal(
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

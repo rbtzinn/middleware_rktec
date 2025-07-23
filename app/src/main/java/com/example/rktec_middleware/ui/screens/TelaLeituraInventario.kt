@@ -1,4 +1,3 @@
-// ui/screens/TelaLeituraInventario.kt
 package com.example.rktec_middleware.ui.screens
 
 import android.widget.Toast
@@ -17,22 +16,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.rktec_middleware.data.db.AppDatabase
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
+import com.example.rktec_middleware.viewmodel.LeituraInventarioViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModel
-import com.example.rktec_middleware.viewmodel.RfidViewModelFactory
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private enum class StatusInventario {
     VERDE, AMARELO, CINZA, VERMELHO, CORRIGIDO
 }
 
-// ALTERAÇÃO: Adicionada a função de normalização que antes estava na outra tela.
 private fun normalizarNome(nome: String): String {
     return nome
         .replace("\"", "")
@@ -62,37 +58,19 @@ private fun StatusInventario.toIcon() = when (this) {
 @Composable
 fun TelaLeituraInventario(
     onVoltar: () -> Unit,
-    banco: AppDatabase,
     usuarioLogado: String,
-    filtroLoja: String?,
-    filtroSetor: String?
+    rfidViewModel: RfidViewModel = hiltViewModel(),
+    leituraViewModel: LeituraInventarioViewModel = hiltViewModel()
 ) {
-
     val context = LocalContext.current
-    val viewModelFactory = RfidViewModelFactory(context)
-    val viewModel: RfidViewModel = viewModel(factory = viewModelFactory)
-    val tagsLidas by viewModel.tagList.collectAsState()
+    val tagsLidas by rfidViewModel.tagList.collectAsState()
     val scope = rememberCoroutineScope()
     val tagsCorrigidasNaSessao = remember { mutableStateListOf<String>() }
 
-    // ALTERAÇÃO: As listas agora são estados locais desta tela.
-    var listaFiltrada by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-    var listaTotal by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
-
-    // ALTERAÇÃO: Carrega os dados do banco de dados em segundo plano quando a tela abre.
-    LaunchedEffect(filtroLoja, filtroSetor) {
-        launch(Dispatchers.IO) {
-            val todosOsItens = banco.inventarioDao().listarTodos()
-            listaTotal = todosOsItens
-
-            // Filtra a lista com base nos filtros recebidos
-            listaFiltrada = todosOsItens.filter { item ->
-                (filtroLoja.isNullOrEmpty() || normalizarNome(item.loja) == filtroLoja) &&
-                        (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
-            }
-        }
-    }
-
+    val listaFiltrada by leituraViewModel.listaFiltrada.collectAsState()
+    val listaTotal by leituraViewModel.listaTotal.collectAsState()
+    val filtroLoja = leituraViewModel.filtroLoja
+    val filtroSetor = leituraViewModel.filtroSetor
 
     RKTecMiddlewareTheme {
         Scaffold(
@@ -100,7 +78,7 @@ fun TelaLeituraInventario(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp) // Altura padrão para um cabeçalho
+                        .height(64.dp)
                         .background(
                             Brush.verticalGradient(
                                 0f to MaterialTheme.colorScheme.primaryContainer,
@@ -125,7 +103,6 @@ fun TelaLeituraInventario(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
-                // Agora este contador vai funcionar corretamente!
                 Text(
                     "Lidos: ${tagsLidas.size} / Esperado: ${listaFiltrada.size}",
                     style = MaterialTheme.typography.bodyLarge,
@@ -154,14 +131,12 @@ fun TelaLeituraInventario(
                             verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
                         ) {
                             items(tagsLidas, key = { it.epc }) { tag ->
-                                val status = statusTag(tag.epc, filtroLoja, filtroSetor, listaFiltrada, listaTotal)
+                                val status = statusTag(tag.epc, filtroLoja, listaFiltrada, listaTotal)
 
                                 if (status == StatusInventario.AMARELO && filtroSetor != null && tag.epc !in tagsCorrigidasNaSessao) {
                                     LaunchedEffect(tag.epc) {
-                                        scope.launch(Dispatchers.IO) {
-                                            banco.inventarioDao().corrigirSetor(tag.epc, filtroSetor)
-                                            tagsCorrigidasNaSessao.add(tag.epc)
-                                        }
+                                        leituraViewModel.corrigirSetor(tag.epc, filtroSetor)
+                                        tagsCorrigidasNaSessao.add(tag.epc)
                                     }
                                 }
 
@@ -202,6 +177,18 @@ fun TelaLeituraInventario(
     }
 }
 
+private fun statusTag(
+    epc: String,
+    filtroLoja: String?,
+    listaFiltrada: List<ItemInventario>,
+    listaTotal: List<ItemInventario>
+): StatusInventario {
+    if (listaFiltrada.any { it.tag == epc }) return StatusInventario.VERDE
+    if (filtroLoja != null && listaTotal.any { it.tag == epc && normalizarNome(it.loja) == filtroLoja }) return StatusInventario.AMARELO
+    if (listaTotal.any { it.tag == epc }) return StatusInventario.CINZA
+    return StatusInventario.VERMELHO
+}
+
 @Composable
 private fun TagLidaItem(epc: String, status: StatusInventario) {
     val statusColor = status.toColor()
@@ -230,19 +217,4 @@ private fun TagLidaItem(epc: String, status: StatusInventario) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
-}
-
-
-private fun statusTag(
-    epc: String,
-    filtroLoja: String?,
-    filtroSetor: String?,
-    listaFiltrada: List<ItemInventario>,
-    listaTotal: List<ItemInventario>
-): StatusInventario {
-    // Agora a 'listaFiltrada' e 'listaTotal' são as que foram carregadas dentro desta tela
-    if (listaFiltrada.any { it.tag == epc }) return StatusInventario.VERDE
-    if (filtroLoja != null && listaTotal.any { it.tag == epc && normalizarNome(it.loja) == filtroLoja }) return StatusInventario.AMARELO
-    if (listaTotal.any { it.tag == epc }) return StatusInventario.CINZA
-    return StatusInventario.VERMELHO
 }

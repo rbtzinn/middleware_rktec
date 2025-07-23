@@ -20,42 +20,33 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.*
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.ui.components.GradientHeader
 import com.example.rktec_middleware.ui.components.InfoChip
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
-import com.example.rktec_middleware.ui.components.GradientHeader
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.example.rktec_middleware.viewmodel.DebugViewModel
 
 @Composable
 fun TelaDebug(
-    banco: AppDatabase,
     usuarioLogado: String,
-    refresh: Int,
     onVoltar: () -> Unit,
-    onBancoLimpo: () -> Unit
+    onBancoLimpo: () -> Unit,
+    viewModel: DebugViewModel = hiltViewModel()
 ) {
-    val scope = rememberCoroutineScope()
-    var inventarioCompleto by remember { mutableStateOf<List<ItemInventario>>(emptyList()) }
+    val inventarioCompleto by viewModel.inventarioCompleto.collectAsState()
     var mostrarDialogLimparBanco by remember { mutableStateOf(false) }
     var textoBusca by remember { mutableStateOf("") }
     var itemEditando by remember { mutableStateOf<ItemInventario?>(null) }
     val context = LocalContext.current
 
-    // Estado para guardar as listas de lojas e setores para os dropdowns
-    var listasParaDropdown by remember { mutableStateOf<Pair<List<String>, List<String>>>(Pair(emptyList(), emptyList())) }
-
-    LaunchedEffect(refresh) {
-        inventarioCompleto = withContext(Dispatchers.IO) {
-            banco.inventarioDao().listarTodos()
+    val listasParaDropdown by remember(inventarioCompleto) {
+        derivedStateOf {
+            val lojas = inventarioCompleto.map { it.loja.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
+            val setores = inventarioCompleto.map { it.localizacao.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
+            Pair(lojas, setores)
         }
-        // Popula as listas para os dropdowns com valores únicos, limpos e ordenados
-        val lojas = inventarioCompleto.map { it.loja.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
-        val setores = inventarioCompleto.map { it.localizacao.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
-        listasParaDropdown = Pair(lojas, setores)
     }
 
     val inventarioFiltrado by remember(textoBusca, inventarioCompleto) {
@@ -75,7 +66,10 @@ fun TelaDebug(
             }
         ) { paddingValues ->
             Column(
-                modifier = Modifier.padding(paddingValues).fillMaxSize().background(MaterialTheme.colorScheme.background)
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(Dimens.PaddingMedium),
                 verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
             ) {
@@ -89,7 +83,9 @@ fun TelaDebug(
                 Card(
                     shape = MaterialTheme.shapes.medium,
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    modifier = Modifier.fillMaxWidth().weight(1f)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
                 ) {
                     Column(Modifier.padding(Dimens.PaddingMedium)) {
                         Text(
@@ -113,7 +109,9 @@ fun TelaDebug(
                 }
                 Button(
                     onClick = { mostrarDialogLimparBanco = true },
-                    modifier = Modifier.fillMaxWidth().height(Dimens.ComponentHeight),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(Dimens.ComponentHeight),
                     shape = MaterialTheme.shapes.medium,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -129,19 +127,9 @@ fun TelaDebug(
                 setoresDisponiveis = listasParaDropdown.second,
                 onDismiss = { itemEditando = null },
                 onConfirm = { itemAtualizado ->
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            banco.inventarioDao().atualizarItem(itemAtualizado)
-                        }
-                        val index = inventarioCompleto.indexOfFirst { it.tag == itemAtualizado.tag }
-                        if (index != -1) {
-                            val novaLista = inventarioCompleto.toMutableList()
-                            novaLista[index] = itemAtualizado
-                            inventarioCompleto = novaLista
-                        }
-                        Toast.makeText(context, "Item atualizado!", Toast.LENGTH_SHORT).show()
-                        itemEditando = null
-                    }
+                    viewModel.atualizarItem(itemAtualizado)
+                    Toast.makeText(context, "Item atualizado!", Toast.LENGTH_SHORT).show()
+                    itemEditando = null
                 }
             )
         }
@@ -155,14 +143,10 @@ fun TelaDebug(
                 confirmButton = {
                     Button(
                         onClick = {
+                            viewModel.limparBanco()
+                            onBancoLimpo()
                             mostrarDialogLimparBanco = false
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    banco.inventarioDao().limparInventario()
-                                }
-                                onBancoLimpo()
-                                Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
-                            }
+                            Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = RktRed)
                     ) { Text("APAGAR TUDO") }
@@ -172,10 +156,13 @@ fun TelaDebug(
         }
     }
 }
+
 @Composable
 private fun ItemDebugCard(item: ItemInventario, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
         elevation = CardDefaults.cardElevation(0.dp),
@@ -291,7 +278,9 @@ private fun DropdownEditavel(
             readOnly = true,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandido) },
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.Black,
                 unfocusedTextColor = Color.Black,
@@ -302,7 +291,9 @@ private fun DropdownEditavel(
         ExposedDropdownMenu(
             expanded = expandido,
             onDismissRequest = { expandido = false },
-            modifier = Modifier.background(Color.White).heightIn(max = 220.dp)
+            modifier = Modifier
+                .background(Color.White)
+                .heightIn(max = 220.dp)
         ) {
             opcoes.forEach { opcao ->
                 DropdownMenuItem(
