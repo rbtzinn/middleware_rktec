@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
+import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.util.LeitorInventario
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,7 +37,7 @@ class MapeamentoViewModel @Inject constructor(
     val mapeamentoState: StateFlow<MapeamentoState> = _mapeamentoState
 
     fun processarEsalvarDados(
-        usuario: String, uri: Uri,
+        usuario: Usuario, uri: Uri,
         dadosBrutos: Pair<List<String>, List<List<String>>>?,
         indexEpc: Int?, indexNome: Int?, indexSetor: Int?, indexLoja: Int?
     ) {
@@ -50,10 +51,11 @@ class MapeamentoViewModel @Inject constructor(
             try {
                 val cabecalho = dadosBrutos.first
                 val linhas = dadosBrutos.second
+                val companyId = usuario.companyId
 
                 // CORREÇÃO: Construtor do MapeamentoPlanilha na ordem correta
                 val mapeamento = MapeamentoPlanilha(
-                    usuario = usuario,
+                    usuario = usuario.nome,
                     nomeArquivo = uri.lastPathSegment ?: "desconhecido",
                     colunaEpc = indexEpc, // Int não nulo
                     colunaNome = indexNome,
@@ -72,7 +74,7 @@ class MapeamentoViewModel @Inject constructor(
                     cabecalho.forEachIndexed { index, nomeColuna ->
                         if (index !in indicesMapeados) colunasExtras[nomeColuna] = linha.getOrNull(index) ?: ""
                     }
-                    ItemInventario(tag, desc, setor, loja, colunasExtras)
+                    ItemInventario(tag, desc, setor, loja, colunasExtras, companyId = companyId)
                 }
 
                 if (listaItens.isEmpty()) {
@@ -80,7 +82,7 @@ class MapeamentoViewModel @Inject constructor(
                     return@launch
                 }
 
-                db.inventarioDao().limparInventario()
+                db.inventarioDao().limparInventarioPorEmpresa(companyId)
                 db.inventarioDao().inserirTodos(listaItens)
 
                 val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)

@@ -4,7 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.repository.InventarioRepository
+import com.example.rktec_middleware.repository.UsuarioRepository
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -12,7 +15,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChecagemViewModel @Inject constructor(
-    private val inventarioRepository: InventarioRepository
+    private val inventarioRepository: InventarioRepository,
+    private val usuarioRepository: UsuarioRepository
 ) : ViewModel() {
 
     private val _itemDaBase = MutableStateFlow<ItemInventario?>(null)
@@ -22,9 +26,15 @@ class ChecagemViewModel @Inject constructor(
     val buscaConcluida: StateFlow<Boolean> = _buscaConcluida
 
     fun buscarItemPorTag(epc: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _buscaConcluida.value = false
-            _itemDaBase.value = inventarioRepository.buscarPorTag(epc)
+            val email = FirebaseAuth.getInstance().currentUser?.email
+            if (email != null) {
+                val usuario = usuarioRepository.buscarPorEmail(email)
+                usuario?.companyId?.let { companyId ->
+                    _itemDaBase.value = inventarioRepository.buscarPorTag(epc, companyId)
+                }
+            }
             _buscaConcluida.value = true
         }
     }

@@ -11,6 +11,7 @@ import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.util.LogHelper
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -18,17 +19,16 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// NOVO: Modelo de dados para agrupar as informações do dashboard
 data class DashboardData(
     val totalItensBase: Int = 0,
-    val ultimaSessao: SessaoInventario? = null
+    val ultimaSessao: SessaoInventario? = null,
+    val nomeEmpresa: String = "" // NOVO CAMPO
 )
 
 @HiltViewModel
 class TelaPrincipalViewModel @Inject constructor(
     private val usuarioRepository: UsuarioRepository,
     private val appDatabase: AppDatabase,
-    // NOVAS INJEÇÕES para buscar os dados do dashboard
     private val inventarioRepository: InventarioRepository,
     private val historicoRepository: HistoricoRepository,
     @ApplicationContext private val context: Context
@@ -37,34 +37,52 @@ class TelaPrincipalViewModel @Inject constructor(
     private val _exportState = MutableStateFlow<ExportProgress>(ExportProgress.Idle)
     val exportState: StateFlow<ExportProgress> = _exportState.asStateFlow()
 
-    // NOVO: StateFlow para conter todos os dados do dashboard
     private val _dashboardData = MutableStateFlow(DashboardData())
     val dashboardData: StateFlow<DashboardData> = _dashboardData.asStateFlow()
 
     init {
-        // Carrega os dados do dashboard quando o ViewModel é criado
         carregarDadosDashboard()
     }
 
     private fun carregarDadosDashboard() {
-        viewModelScope.launch {
-            // Busca o total de itens em paralelo com a última sessão
-            val totalItens = inventarioRepository.listarTodos().size
-            historicoRepository.getTodasSessoes().collect { sessoes ->
-                _dashboardData.value = DashboardData(
-                    totalItensBase = totalItens,
-                    ultimaSessao = sessoes.firstOrNull() // Pega a mais recente
-                )
+        viewModelScope.launch(Dispatchers.IO) {
+            val email = FirebaseAuth.getInstance().currentUser?.email
+            if (email != null) {
+                val usuario = usuarioRepository.buscarPorEmail(email)
+                val companyId = usuario?.companyId
+
+                if (companyId != null) {
+                    val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
+                    val totalItens = inventarioRepository.listarTodosPorEmpresa(companyId).size
+
+                    historicoRepository.getTodasSessoes().collect { sessoes ->
+                        val ultimaSessaoDaEmpresa = sessoes.filter { it.companyId == companyId }.firstOrNull()
+
+                        _dashboardData.value = DashboardData(
+                            totalItensBase = totalItens,
+                            ultimaSessao = ultimaSessaoDaEmpresa,
+                            nomeEmpresa = empresa?.nome ?: "Empresa não encontrada" // ATUALIZA O NOME
+                        )
+                    }
+                }
             }
         }
     }
 
     fun exportarPlanilhaCompleta() {
         viewModelScope.launch(Dispatchers.IO) {
-            LogHelper.exportarPlanilhaCompleta(context, appDatabase)
-                .collect { progress ->
-                    _exportState.value = progress
+            val email = FirebaseAuth.getInstance().currentUser?.email
+            if (email != null) {
+                val usuario = usuarioRepository.buscarPorEmail(email)
+                usuario?.companyId?.let { companyId ->
+                    LogHelper.exportarPlanilhaCompleta(context, appDatabase, companyId)
+                        .collect { progress ->
+                            _exportState.value = progress
+                        }
+                } ?: run {
+                    _exportState.value = ExportProgress.Error("Usuário não encontrado para exportação.")
                 }
+            }
         }
     }
 

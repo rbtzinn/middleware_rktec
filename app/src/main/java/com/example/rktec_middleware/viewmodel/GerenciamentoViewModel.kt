@@ -24,7 +24,10 @@ class GerenciamentoViewModel @Inject constructor(
     private val _usuarios = MutableStateFlow<List<Usuario>>(emptyList())
     val usuarios = _usuarios.asStateFlow()
 
-    // CORREÇÃO 1: Acessar o e-mail do usuário logado é seguro, pois a tela só é acessível por admins.
+    // NOVO: StateFlow para o nome da empresa
+    private val _nomeEmpresa = MutableStateFlow("")
+    val nomeEmpresa = _nomeEmpresa.asStateFlow()
+
     val usuarioLogadoEmail: String = FirebaseAuth.getInstance().currentUser?.email ?: ""
 
     init {
@@ -33,21 +36,19 @@ class GerenciamentoViewModel @Inject constructor(
 
     private fun sincronizarEcarregarUsuarios() {
         viewModelScope.launch(Dispatchers.IO) {
-            // CORREÇÃO 2: Primeiro, buscamos o perfil do administrador logado no banco local para obter o companyId.
             val admin = usuarioRepository.buscarPorEmail(usuarioLogadoEmail)
             val companyId = admin?.companyId
 
-            // Só continuamos se tivermos um companyId válido.
             if (!companyId.isNullOrEmpty()) {
-                // CORREÇÃO 3: Passamos o companyId para buscar apenas os usuários da empresa correta na nuvem.
+                val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
+                _nomeEmpresa.value = empresa?.nome ?: "Empresa Desconhecida"
+
                 val usuariosDaNuvem = usuarioRepository.buscarTodosUsuariosNoFirestore(companyId)
                 if (usuariosDaNuvem.isNotEmpty()) {
                     usuariosDaNuvem.forEach { usuario ->
-                        // A função 'cadastrarUsuario' já atualiza se o usuário existir (graças ao onConflict=REPLACE)
                         usuarioRepository.cadastrarUsuario(usuario)
                     }
                 }
-                // CORREÇÃO 4: A busca final no banco de dados local também é filtrada pelo companyId.
                 _usuarios.value = usuarioRepository.listarTodosPorEmpresa(companyId).sortedBy { it.nome }
             }
         }
@@ -78,6 +79,7 @@ class GerenciamentoViewModel @Inject constructor(
                 usuarioAlvo = usuario.email, motivo = motivo,
                 detalhes = "Status de ${usuario.email} alterado para ${if (novaAtividade) "ativo" else "inativo"}."
             )
+            // Recarrega e re-sincroniza a lista para garantir consistência.
             sincronizarEcarregarUsuarios()
         }
     }

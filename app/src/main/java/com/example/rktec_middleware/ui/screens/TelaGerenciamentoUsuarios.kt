@@ -41,6 +41,7 @@ fun TelaGerenciamentoUsuarios(
     val scope = rememberCoroutineScope()
     val usuarios by viewModel.usuarios.collectAsState()
     val usuarioLogadoEmail = viewModel.usuarioLogadoEmail
+    val nomeEmpresa by viewModel.nomeEmpresa.collectAsState()
 
     var editandoUsuario by remember { mutableStateOf<Usuario?>(null) }
     var mostrandoDialogoExcluir by remember { mutableStateOf<Usuario?>(null) }
@@ -48,7 +49,11 @@ fun TelaGerenciamentoUsuarios(
 
         Scaffold(
             topBar = {
-                GradientHeader(title = "Gerenciamento de Usuários", onVoltar = onVoltar)
+                GradientHeader(
+                    title = "Gerenciamento de Usuários",
+                    subtitle = nomeEmpresa,
+                    onVoltar = onVoltar
+                )
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { padding ->

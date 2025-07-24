@@ -108,9 +108,12 @@ fun TelaPrincipal(
                         )
                         Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
                         Column {
-                            Text("Bem-vindo!", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f)))
                             Text(
-                                usuario.nome.split(" ").first(),
+                                dashboardData.nomeEmpresa,
+                                style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
+                            )
+                            Text(
+                                "Bem-vindo, ${usuario.nome.split(" ").first()}",
                                 style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
                                 maxLines = 1,
                             )

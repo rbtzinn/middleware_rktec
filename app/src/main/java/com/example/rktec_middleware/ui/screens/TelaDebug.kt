@@ -114,7 +114,7 @@ fun TelaDebug(
                 shape = MaterialTheme.shapes.medium,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
-                Text("Limpar Banco de Dados", style = MaterialTheme.typography.labelLarge)
+                Text("Limpar Dados da Empresa", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -137,18 +137,18 @@ fun TelaDebug(
         AlertDialog(
             onDismissRequest = { mostrarDialogLimparBanco = false },
             icon = { Icon(Icons.Default.Warning, "Atenção", tint = RktRed) },
-            title = { Text("Limpar TODOS os dados?") },
-            text = { Text("Isso vai apagar todo o inventário, coletas, logs e mapeamentos. A ação não pode ser desfeita.") },
+            title = { Text("Limpar Dados da Empresa?") },
+            text = { Text("Isso vai apagar o inventário e mapeamentos APENAS da sua empresa. A ação não pode ser desfeita.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.limparBanco()
+                        viewModel.limparDadosDaEmpresa()
                         onBancoLimpo()
                         mostrarDialogLimparBanco = false
-                        Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Dados da empresa limpos.", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = RktRed)
-                ) { Text("APAGAR TUDO") }
+                ) { Text("SIM, APAGAR") }
             },
             dismissButton = { OutlinedButton(onClick = { mostrarDialogLimparBanco = false }) { Text("Cancelar") } }
         )

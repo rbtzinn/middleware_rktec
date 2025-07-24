@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.components.SecondaryTextButton
 import com.example.rktec_middleware.ui.theme.*
@@ -29,7 +30,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun TelaMapeamentoPlanilha(
     uri: Uri,
-    usuarioLogado: String,
+    usuario: Usuario,
     onSalvar: (totalItens: Int) -> Unit,
     onCancelar: () -> Unit,
     viewModel: MapeamentoViewModel = hiltViewModel()
@@ -121,7 +122,7 @@ fun TelaMapeamentoPlanilha(
                     PrimaryButton(
                         onClick = {
                             viewModel.processarEsalvarDados(
-                                usuario = usuarioLogado,
+                                usuario = usuario,
                                 uri = uri,
                                 dadosBrutos = dadosBrutos,
                                 indexEpc = indexEpc,

@@ -19,11 +19,12 @@ import androidx.compose.ui.unit.dp
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.theme.Dimens
 import com.example.rktec_middleware.ui.theme.RktGreen
+import com.example.rktec_middleware.data.model.Usuario
 
 @Composable
 fun TelaImportacao(
     onConcluido: (String) -> Unit,
-    usuario: String,
+    usuario: Usuario,
     onSobreClick: () -> Unit
 ) {
     var uriParaMapeamento by remember { mutableStateOf<Uri?>(null) }
@@ -59,7 +60,7 @@ fun TelaImportacao(
     if (uriParaMapeamento != null) {
         TelaMapeamentoPlanilha(
             uri = uriParaMapeamento!!,
-            usuarioLogado = usuario,
+            usuario = usuario,
             onSalvar = { totalItens ->
                 uriParaMapeamento = null
                 onConcluido("Importação de $totalItens itens concluída com sucesso!")

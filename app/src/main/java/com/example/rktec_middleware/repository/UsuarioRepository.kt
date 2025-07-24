@@ -2,6 +2,7 @@ package com.example.rktec_middleware.repository
 
 import android.util.Log
 import com.example.rktec_middleware.data.dao.UsuarioDao
+import com.example.rktec_middleware.data.model.Empresa
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.google.firebase.firestore.FirebaseFirestore
@@ -21,6 +22,7 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
     suspend fun buscarPorEmail(email: String) = usuarioDao.buscarPorEmail(email)
     suspend fun listarTodosPorEmpresa(companyId: String) = usuarioDao.listarTodosPorEmpresa(companyId)
     suspend fun listarEmails(): List<String> = usuarioDao.listarEmails()
+    private val empresasCollection = firebaseDb.collection("empresas")
 
     suspend fun buscarUsuarioNoFirestore(email: String): Usuario? {
         return try {
@@ -28,6 +30,16 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
             document.toObject<Usuario>()
         } catch (e: Exception) {
             Log.e("UsuarioRepository", "Erro ao buscar usuário no Firestore", e)
+            null
+        }
+    }
+
+    suspend fun buscarEmpresaPorId(companyId: String): Empresa? {
+        return try {
+            val document = empresasCollection.document(companyId).get().await()
+            document.toObject<Empresa>()?.copy(id = document.id) // Copia o ID para dentro do objeto
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao buscar empresa por ID", e)
             null
         }
     }

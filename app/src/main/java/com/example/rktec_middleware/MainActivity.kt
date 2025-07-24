@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity() {
                                         authViewModel.setMapeamentoConcluido(true)
                                         navController.navigate(Screen.Principal.route) { popUpTo(Screen.Importacao.route) { inclusive = true } }
                                     },
-                                    usuario = usuarioAutenticado.nome,
+                                    usuario = usuarioAutenticado,
                                     onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                 )
                             }

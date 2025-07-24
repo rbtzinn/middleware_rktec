@@ -35,7 +35,7 @@ import com.example.rktec_middleware.data.model.SessaoInventario
         ItemSessao::class,
         LogEdicaoItem::class
     ],
-    version = 18
+    version = 19
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao

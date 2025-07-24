@@ -5,21 +5,22 @@ import com.example.rktec_middleware.data.model.ItemInventario
 
 @Dao
 interface InventarioDao {
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun inserirTodos(itens: List<ItemInventario>)
+    suspend fun inserirTodos(items: List<ItemInventario>)
 
-    @Query("SELECT * FROM inventario")
-    suspend fun listarTodos(): List<ItemInventario>
+    @Query("DELETE FROM itens_inventario WHERE companyId = :companyId")
+    suspend fun limparInventarioPorEmpresa(companyId: String)
 
-    @Query("SELECT * FROM inventario WHERE tag = :tag LIMIT 1")
-    suspend fun buscarPorTag(tag: String): ItemInventario?
+    @Query("SELECT * FROM itens_inventario WHERE companyId = :companyId")
+    suspend fun listarTodosPorEmpresa(companyId: String): List<ItemInventario>
 
-    @Query("DELETE FROM inventario")
-    suspend fun limparInventario()
+    @Query("SELECT * FROM itens_inventario WHERE tag = :tag AND companyId = :companyId")
+    suspend fun buscarPorTag(tag: String, companyId: String): ItemInventario?
+
+    @Query("UPDATE itens_inventario SET localizacao = :novoSetor WHERE tag = :tag AND companyId = :companyId")
+    suspend fun corrigirSetor(tag: String, novoSetor: String, companyId: String)
 
     @Update
     suspend fun atualizarItem(item: ItemInventario)
-
-    @Query("UPDATE inventario SET localizacao = :novaLocalizacao, foiCorrigidoAutomaticamente = 1 WHERE tag = :tag")
-    suspend fun corrigirSetor(tag: String, novaLocalizacao: String)
 }

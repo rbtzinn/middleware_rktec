@@ -21,8 +21,7 @@ object LogHelper {
 
     // --- FUNÇÃO 1: EXPORTAR A PLANILHA (AGORA COM FLOW DE PROGRESSO) ---
     // MUDANÇA: A função agora retorna um Flow<ExportProgress> e não é mais 'suspend'.
-    fun exportarPlanilhaCompleta(context: Context, banco: AppDatabase): Flow<ExportProgress> = flow {
-        // MUDANÇA: Emite o estado inicial de 0%
+    fun exportarPlanilhaCompleta(context: Context, banco: AppDatabase, companyId: String): Flow<ExportProgress> = flow {
         emit(ExportProgress.InProgress(0))
 
         val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
@@ -42,7 +41,7 @@ object LogHelper {
             return@flow
         }
 
-        val todosOsItens = banco.inventarioDao().listarTodos()
+        val todosOsItens = banco.inventarioDao().listarTodosPorEmpresa(companyId)
         val totalDeItens = todosOsItens.size
         if (totalDeItens == 0) {
             emit(ExportProgress.Error("Nenhum item no inventário para exportar."))

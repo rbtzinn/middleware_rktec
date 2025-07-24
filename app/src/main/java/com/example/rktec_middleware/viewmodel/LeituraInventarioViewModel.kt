@@ -11,6 +11,8 @@ import com.example.rktec_middleware.data.model.StatusItemSessao
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
+import com.example.rktec_middleware.repository.UsuarioRepository
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,8 +27,9 @@ private fun normalizarNome(nome: String): String {
 
 @HiltViewModel
 class LeituraInventarioViewModel @Inject constructor(
-    private val repository: InventarioRepository,
+    private val inventarioRepository: InventarioRepository,
     private val historicoRepository: HistoricoRepository,
+    private val usuarioRepository: UsuarioRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -39,24 +42,35 @@ class LeituraInventarioViewModel @Inject constructor(
     private val _listaFiltrada = MutableStateFlow<List<ItemInventario>>(emptyList())
     val listaFiltrada: StateFlow<List<ItemInventario>> = _listaFiltrada
 
+    private var companyId: String? = null
+
     init {
         carregarDados()
     }
 
     private fun carregarDados() {
         viewModelScope.launch(Dispatchers.IO) {
-            val todosOsItens = repository.listarTodos()
-            _listaTotal.value = todosOsItens
-            _listaFiltrada.value = todosOsItens.filter { item ->
-                (filtroLoja.isNullOrEmpty() || normalizarNome(item.loja) == filtroLoja) &&
-                        (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
+            val email = FirebaseAuth.getInstance().currentUser?.email
+            if (email != null) {
+                val usuario = usuarioRepository.buscarPorEmail(email)
+                companyId = usuario?.companyId
+                if (companyId != null) {
+                    val todosOsItens = inventarioRepository.listarTodosPorEmpresa(companyId!!)
+                    _listaTotal.value = todosOsItens
+                    _listaFiltrada.value = todosOsItens.filter { item ->
+                        (filtroLoja.isNullOrEmpty() || normalizarNome(item.loja) == filtroLoja) &&
+                                (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
+                    }
+                }
             }
         }
     }
 
     fun corrigirSetor(epc: String, novoSetor: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.corrigirSetor(epc, novoSetor)
+            companyId?.let { id ->
+                inventarioRepository.corrigirSetor(epc, novoSetor, id)
+            }
         }
     }
 
