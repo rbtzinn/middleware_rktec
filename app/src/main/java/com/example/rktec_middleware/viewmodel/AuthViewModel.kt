@@ -2,8 +2,10 @@ package com.example.rktec_middleware.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
+import com.example.rktec_middleware.viewmodel.AuthState.Autenticado
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +36,15 @@ class AuthViewModel @Inject constructor( // Injeção no construtor
             val firebaseUser = FirebaseAuth.getInstance().currentUser
 
             if (firebaseUser?.email != null) {
-                val usuarioLocal = usuarioRepository.buscarPorEmail(firebaseUser.email!!)
+                var usuarioLocal = usuarioRepository.buscarPorEmail(firebaseUser.email!!)
+
+                if (usuarioLocal == null) {
+                    val usuarioFirestore = usuarioRepository.buscarUsuarioNoFirestore(firebaseUser.email!!)
+                    if (usuarioFirestore != null) {
+                        usuarioRepository.cadastrarUsuario(usuarioFirestore)
+                        usuarioLocal = usuarioFirestore
+                    }
+                }
                 if (usuarioLocal != null && usuarioLocal.ativo) {
                     val mapeamentoConcluido = isMapeamentoOk()
                     _authState.value = AuthState.Autenticado(usuarioLocal, mapeamentoConcluido)
@@ -63,6 +73,22 @@ class AuthViewModel @Inject constructor( // Injeção no construtor
         viewModelScope.launch {
             FirebaseAuth.getInstance().signOut()
             _authState.value = AuthState.NaoAutenticado
+        }
+    }
+
+    fun promoverUsuarioAtualParaAdmin() {
+        viewModelScope.launch {
+            val estadoAtual = _authState.value
+            if (estadoAtual is Autenticado) {
+                val usuario = estadoAtual.usuario
+                if (usuario.tipo != TipoUsuario.ADMIN) {
+                    val usuarioAdmin = usuario.copy(tipo = TipoUsuario.ADMIN)
+                    // Atualiza no repositório (que sincroniza com Firestore)
+                    usuarioRepository.atualizarUsuario(usuarioAdmin)
+                    // Atualiza o estado local IMEDIATAMENTE
+                    _authState.value = estadoAtual.copy(usuario = usuarioAdmin)
+                }
+            }
         }
     }
 

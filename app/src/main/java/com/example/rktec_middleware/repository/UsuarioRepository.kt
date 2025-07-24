@@ -1,13 +1,17 @@
 package com.example.rktec_middleware.repository
 
+import android.util.Log
 import com.example.rktec_middleware.data.dao.UsuarioDao
+import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// MUDANÇA: Adicionadas as anotações do Hilt para que ele possa ser injetado
 @Singleton
 class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) {
 
@@ -15,24 +19,43 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
     private val usuariosCollection = firebaseDb.collection("usuarios")
 
     suspend fun buscarPorEmail(email: String) = usuarioDao.buscarPorEmail(email)
-
-    suspend fun buscarPorNome(nome: String) = usuarioDao.buscarPorNome(nome)
-
-    suspend fun listarTodos() = usuarioDao.listarTodos()
-
+    suspend fun listarTodosPorEmpresa(companyId: String) = usuarioDao.listarTodosPorEmpresa(companyId)
     suspend fun listarEmails(): List<String> = usuarioDao.listarEmails()
 
-    suspend fun deletarUsuario(usuario: Usuario) {
-        usuarioDao.deletar(usuario)
-        usuariosCollection.document(usuario.email).delete().await()
+    suspend fun buscarUsuarioNoFirestore(email: String): Usuario? {
+        return try {
+            val document = usuariosCollection.document(email).get().await()
+            document.toObject<Usuario>()
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao buscar usuário no Firestore", e)
+            null
+        }
     }
 
-    suspend fun setUsuarioAtivo(email: String, ativo: Boolean) {
-        usuarioDao.setAtivo(email, ativo)
+    suspend fun buscarTodosUsuariosNoFirestore(companyId: String): List<Usuario> {
+        return try {
+            val snapshot = usuariosCollection
+                .whereEqualTo("companyId", companyId)
+                .get()
+                .await()
+            snapshot.toObjects(Usuario::class.java)
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao buscar todos os usuários no Firestore", e)
+            emptyList()
+        }
     }
 
     suspend fun cadastrarUsuario(usuario: Usuario) {
         usuarioDao.inserir(usuario)
+        val usuarioMap = mapOf(
+            "nome" to usuario.nome,
+            "email" to usuario.email,
+            "senhaHash" to usuario.senhaHash,
+            "tipo" to usuario.tipo.name,
+            "ativo" to usuario.ativo,
+            "companyId" to usuario.companyId
+        )
+        usuariosCollection.document(usuario.email).set(usuarioMap).await()
     }
 
     suspend fun atualizarUsuario(usuario: Usuario) {
@@ -41,8 +64,38 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
             "nome" to usuario.nome,
             "email" to usuario.email,
             "senhaHash" to usuario.senhaHash,
-            "tipo" to usuario.tipo.name
+            "tipo" to usuario.tipo.name,
+            "ativo" to usuario.ativo,
+            "companyId" to usuario.companyId
         )
         usuariosCollection.document(usuario.email).set(usuarioMap).await()
+    }
+
+    // NOVA FUNÇÃO QUE ESTAVA FALTANDO
+    suspend fun reativarETransferirUsuario(usuario: Usuario, novoCodigoConvite: String): Result<Usuario> {
+        return try {
+            val snapshot = Firebase.firestore.collection("empresas")
+                .whereEqualTo("codigoConvite", novoCodigoConvite.uppercase())
+                .get().await()
+
+            if (snapshot.isEmpty) {
+                return Result.failure(Exception("Código da empresa inválido."))
+            }
+
+            val novoCompanyId = snapshot.documents.first().id
+
+            val usuarioAtualizado = usuario.copy(
+                ativo = true,
+                companyId = novoCompanyId,
+                tipo = TipoUsuario.MEMBRO
+            )
+
+            atualizarUsuario(usuarioAtualizado)
+
+            Result.success(usuarioAtualizado)
+
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

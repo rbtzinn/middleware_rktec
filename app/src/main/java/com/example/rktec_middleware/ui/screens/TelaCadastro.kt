@@ -26,6 +26,7 @@ fun TelaCadastro(
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var confirmacao by remember { mutableStateOf("") }
+    var codigoEmpresa by remember { mutableStateOf("") } // NOVO CAMPO
     var mostrarErro by remember { mutableStateOf<String?>(null) }
 
     var senhaVisivel by remember { mutableStateOf(false) }
@@ -60,6 +61,14 @@ fun TelaCadastro(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // NOVO CAMPO OBRIGATÓRIO PARA O CÓDIGO DA EMPRESA
+            StandardTextField(
+                value = codigoEmpresa,
+                onValueChange = { codigoEmpresa = it.uppercase() }, // Converte para maiúsculas para consistência
+                label = "Código da Empresa",
+                leadingIcon = { Icon(Icons.Default.Business, contentDescription = "Código da Empresa") }
+            )
+            Spacer(Modifier.height(Dimens.PaddingMedium))
             StandardTextField(
                 value = nome,
                 onValueChange = { nome = it },
@@ -110,20 +119,20 @@ fun TelaCadastro(
             PrimaryButton(
                 onClick = {
                     mostrarErro = null
+                    // Validações atualizadas
                     when {
+                        codigoEmpresa.isBlank() ->
+                            mostrarErro = "O código da empresa é obrigatório!"
                         nome.isBlank() || email.isBlank() || senha.isBlank() || confirmacao.isBlank() ->
-                            mostrarErro = "Preencha todos os campos!"
+                            mostrarErro = "Preencha todos os outros campos!"
                         senha.length < 6 ->
                             mostrarErro = "A senha deve ter pelo menos 6 caracteres."
-                        !senha.any { it.isDigit() } ->
-                            mostrarErro = "A senha deve conter pelo menos um número."
-                        !senha.any { it.isLetter() } ->
-                            mostrarErro = "A senha deve conter pelo menos uma letra."
                         senha != confirmacao ->
                             mostrarErro = "As senhas não conferem!"
                         else -> {
                             val primeiroNome = nome.trim().split(" ").first()
-                            cadastroViewModel.cadastrar(primeiroNome, email.trim(), senha)
+                            // Passa o código da empresa para o ViewModel
+                            cadastroViewModel.cadastrar(primeiroNome, email.trim(), senha, codigoEmpresa.trim())
                         }
                     }
                 },

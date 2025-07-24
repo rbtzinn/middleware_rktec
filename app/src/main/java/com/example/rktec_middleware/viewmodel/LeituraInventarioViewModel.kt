@@ -3,7 +3,13 @@ package com.example.rktec_middleware.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.rktec_middleware.data.model.EpcTag
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.data.model.ItemSessao
+import com.example.rktec_middleware.data.model.SessaoInventario
+import com.example.rktec_middleware.data.model.StatusItemSessao
+import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.collections.map
 
 private fun normalizarNome(nome: String): String {
     return nome.replace("\"", "").trim().uppercase()
@@ -19,6 +26,7 @@ private fun normalizarNome(nome: String): String {
 @HiltViewModel
 class LeituraInventarioViewModel @Inject constructor(
     private val repository: InventarioRepository,
+    private val historicoRepository: HistoricoRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -49,6 +57,48 @@ class LeituraInventarioViewModel @Inject constructor(
     fun corrigirSetor(epc: String, novoSetor: String) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.corrigirSetor(epc, novoSetor)
+        }
+    }
+
+    fun finalizarEsalvarSessao(
+        usuario: Usuario,
+        tagsLidas: List<EpcTag>
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val epcsLidos = tagsLidas.map { it.epc }.toSet()
+            val itensEsperados = _listaFiltrada.value
+            val todosOsItens = _listaTotal.value
+
+            val itensEncontrados = itensEsperados.filter { it.tag in epcsLidos }
+            val itensFaltantes = itensEsperados.filterNot { it.tag in epcsLidos }
+            val epcsAdicionais = epcsLidos - itensEsperados.map { it.tag }.toSet()
+
+            val itensSessao = mutableListOf<ItemSessao>()
+            itensEncontrados.forEach { itensSessao.add(ItemSessao(sessaoId = 0, epc = it.tag, descricao = it.desc, status = StatusItemSessao.ENCONTRADO)) }
+            itensFaltantes.forEach { itensSessao.add(ItemSessao(sessaoId = 0, epc = it.tag, descricao = it.desc, status = StatusItemSessao.FALTANTE)) }
+
+            epcsAdicionais.forEach { epc ->
+                val item = todosOsItens.find { it.tag == epc }
+                val status = when {
+                    item == null -> StatusItemSessao.ADICIONAL_DESCONHECIDO
+                    item.loja != filtroLoja -> StatusItemSessao.ADICIONAL_OUTRA_LOJA
+                    else -> StatusItemSessao.ADICIONAL_MESMA_LOJA
+                }
+                itensSessao.add(ItemSessao(sessaoId = 0, epc = epc, descricao = item?.desc ?: "Item desconhecido", status = status))
+            }
+
+            val sessao = SessaoInventario(
+                usuarioResponsavel = usuario.nome,
+                filtroLoja = filtroLoja,
+                filtroSetor = filtroSetor,
+                totalEsperado = itensEsperados.size,
+                totalEncontrado = itensEncontrados.size,
+                totalFaltante = itensFaltantes.size,
+                totalAdicional = epcsAdicionais.size,
+                companyId = usuario.companyId
+            )
+
+            historicoRepository.salvarSessaoCompleta(sessao, itensSessao)
         }
     }
 }

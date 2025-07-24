@@ -5,12 +5,12 @@ import androidx.room.PrimaryKey
 
 enum class TipoUsuario { ADMIN, MEMBRO }
 
-@Entity
+@Entity(tableName = "usuarios")
 data class Usuario(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val nome: String,
-    val email: String,
-    val senhaHash: String,
-    val tipo: TipoUsuario,
-    val ativo: Boolean = true
+    @PrimaryKey val email: String = "",
+    val nome: String = "",
+    val senhaHash: String = "",
+    val tipo: TipoUsuario = TipoUsuario.MEMBRO,
+    val ativo: Boolean = true,
+    val companyId: String = ""
 )

@@ -65,7 +65,6 @@ fun TelaInventario(
                 (filtroSetor.isNullOrEmpty() || item.localizacao.trim() == filtroSetor)
     }
 
-    RKTecMiddlewareTheme {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             Box(
                 modifier = Modifier
@@ -202,7 +201,6 @@ fun TelaInventario(
             )
         }
     }
-}
 
 // A função ItemInventarioCard permanece a mesma.
 @Composable

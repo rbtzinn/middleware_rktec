@@ -37,7 +37,6 @@ import com.example.rktec_middleware.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaSobre(onVoltar: () -> Unit) {
-    RKTecMiddlewareTheme {
         Scaffold(
             topBar = {
                 GradientHeader(title = "Sobre o Aplicativo", onVoltar = onVoltar)
@@ -89,7 +88,6 @@ fun TelaSobre(onVoltar: () -> Unit) {
             }
         }
     }
-}
 
 @Composable
 private fun FeatureItem(icon: ImageVector, title: String, description: String) {

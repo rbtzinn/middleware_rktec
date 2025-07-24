@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ExportProgress
+import com.example.rktec_middleware.data.model.SessaoInventario
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.ui.components.AvatarComGestoSecreto
 import com.example.rktec_middleware.ui.components.StandardTextField
@@ -32,8 +33,11 @@ import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
 import com.example.rktec_middleware.viewmodel.AuthViewModel
 import com.example.rktec_middleware.viewmodel.AuthState
+import com.example.rktec_middleware.viewmodel.DashboardData
 import com.example.rktec_middleware.viewmodel.TelaPrincipalViewModel
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun TelaPrincipal(
@@ -45,12 +49,15 @@ fun TelaPrincipal(
     onSairClick: () -> Unit,
     onGerenciarUsuariosClick: () -> Unit,
     onConfiguracoesClick: () -> Unit,
+    onHistoricoClick: () -> Unit,
     telaPrincipalViewModel: TelaPrincipalViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.authState.collectAsState()
     val usuario = (authState as? AuthState.Autenticado)?.usuario
 
     val exportState by telaPrincipalViewModel.exportState.collectAsState()
+    // NOVO: Coletar os dados do dashboard
+    val dashboardData by telaPrincipalViewModel.dashboardData.collectAsState()
 
     var mostrarDialogSair by remember { mutableStateOf(false) }
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
@@ -85,6 +92,7 @@ fun TelaPrincipal(
                     .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(rememberScrollState())
             ) {
+                // O Header permanece o mesmo
                 Box(
                     modifier = Modifier.fillMaxWidth().height(140.dp).background(
                         Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer, 1f to MaterialTheme.colorScheme.primary)
@@ -124,6 +132,7 @@ fun TelaPrincipal(
                     }
                 }
 
+                // MUDANÇA: Seção do Dashboard adicionada
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -131,9 +140,20 @@ fun TelaPrincipal(
                         .padding(horizontal = Dimens.PaddingLarge),
                     verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                 ) {
+                    DashboardSection(dashboardData)
+
+                    // Os FeatureCards continuam aqui
                     FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
                     FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
                     FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
+                    FeatureCard(
+                        title = "Histórico de Inventários",
+                        subtitle = "Consulte relatórios de contagens passadas",
+                        icon = Icons.Default.History,
+                        color = MaterialTheme.colorScheme.secondary,
+                        onClick = onHistoricoClick,
+                        description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais."
+                    )
                     FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
                 }
 
@@ -199,13 +219,12 @@ fun TelaPrincipal(
                 DialogPromoverAdmin(
                     onConfirmar = { codigoDigitado ->
                         if (codigoDigitado == "@DM2025") {
-                            telaPrincipalViewModel.promoverParaAdmin(usuario) {
-                                scope.launch {
-                                    authViewModel.recarregarUsuario()
-                                    LogHelper.registrarGerenciamentoUsuario(context, "SISTEMA", "PROMOÇÃO ADM", usuario.email, "Promoção via código secreto", "Usuário promovido a ADMIN pelo código secreto.")
-                                    Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
-                                    mostrarDialogAdmin = false
-                                }
+                            authViewModel.promoverUsuarioAtualParaAdmin()
+
+                            scope.launch {
+                                LogHelper.registrarGerenciamentoUsuario(context, "SISTEMA", "PROMOÇÃO ADM", usuario.email, "Promoção via código secreto", "Usuário promovido a ADMIN pelo código secreto.")
+                                Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
+                                mostrarDialogAdmin = false
                             }
                             return@DialogPromoverAdmin true
                         } else {
@@ -223,6 +242,62 @@ fun TelaPrincipal(
         }
     }
 }
+
+@Composable
+private fun DashboardSection(data: DashboardData) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+        data.ultimaSessao?.let { sessao ->
+            val formatadorData = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+            val acuracidade = if (sessao.totalEsperado > 0) {
+                (sessao.totalEncontrado.toFloat() / sessao.totalEsperado.toFloat()) * 100
+            } else 100f
+
+            Card(
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(Modifier.padding(Dimens.PaddingMedium)) {
+                    Text("Último Inventário", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Realizado em ${formatadorData.format(Date(sessao.dataHora))} por ${sessao.usuarioResponsavel}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(Dimens.PaddingMedium))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                        DashboardInfoItem(value = "${acuracidade.toInt()}%", label = "Acuracidade", color = RktGreen)
+                        DashboardInfoItem(value = sessao.totalFaltante.toString(), label = "Faltantes", color = RktRed)
+                        DashboardInfoItem(value = sessao.totalAdicional.toString(), label = "Adicionais", color = RktOrange)
+                    }
+                }
+            }
+        }
+
+        Card(
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(Dimens.PaddingMedium),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Inventory2, contentDescription = "Inventário", modifier = Modifier.size(Dimens.IconSizeLarge), tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(Dimens.PaddingMedium))
+                Text("Total de Ativos na Base:", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.weight(1f))
+                Text(data.totalItensBase.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardInfoItem(value: String, label: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
 
 @Composable
 private fun ProgressOverlay(

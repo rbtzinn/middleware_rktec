@@ -16,6 +16,13 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
     object ColetaAvulsa : Screen("coleta_avulsa")
     object Sobre : Screen("sobre")
     object GerenciamentoUsuarios : Screen("gerenciamento_usuarios")
+    object Historico : Screen("historico")
+    object DetalheHistorico : Screen(
+        route = "detalhe_historico/{sessaoId}",
+        arguments = listOf(navArgument("sessaoId") { type = NavType.LongType })
+    ) {
+        fun createRoute(sessaoId: Long) = "detalhe_historico/$sessaoId"
+    }
 
     // Rota que precisa de argumentos para funcionar
     object LeituraInventario : Screen(

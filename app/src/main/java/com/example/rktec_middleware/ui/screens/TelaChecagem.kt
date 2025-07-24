@@ -26,6 +26,7 @@ import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.viewmodel.ChecagemViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModel
+import kotlinx.coroutines.delay
 
 private enum class StatusChecagem {
     AGUARDANDO_INPUT,
@@ -42,6 +43,14 @@ private fun normalizarRssi(rssi: String, minRssi: Int = -90, maxRssi: Int = -30)
         normalized.coerceIn(0f, 1f)
     } catch (e: Exception) {
         0f
+    }
+}
+
+private fun getIndicatorColor(progress: Float): Color {
+    return when {
+        progress < 0.4f -> RktBlueInfo
+        progress < 0.75f -> RktGreen
+        else -> RktRed
     }
 }
 
@@ -71,13 +80,23 @@ fun TelaChecagem(
     LaunchedEffect(status, scanEvent) {
         val evento = scanEvent
         if (evento != null && evento.epc == epcParaChecar) {
+            // Lógica para confirmar item (sem alteração)
             if (status == StatusChecagem.AGUARDANDO_LEITURA_FISICA) {
                 status = StatusChecagem.ITEM_ENCONTRADO
+                rfidViewModel.playBeep()
                 rfidViewModel.stopReading()
             }
+            // Lógica do modo localizador
             if (status == StatusChecagem.LOCALIZANDO) {
                 itemDaBase?.let {
-                    it.rssi = normalizarRssi(evento.rssi)
+                    val normalizedRssi = normalizarRssi(evento.rssi)
+                    it.rssi = normalizedRssi
+
+                    if (normalizedRssi > 0.1) {
+                        rfidViewModel.playBeep()
+                        val delayMillis = (100 + (1 - normalizedRssi) * 700).toLong()
+                        delay(delayMillis)
+                    }
                 }
             }
         }
@@ -273,6 +292,10 @@ private fun DetalhesItemCard(item: ItemInventario?) {
 @Composable
 private fun SignalIndicator(progress: Float) {
     val animatedProgress by animateFloatAsState(targetValue = progress, label = "signalAnimation")
+
+    // MUDANÇA: A cor agora é dinâmica
+    val indicatorColor = getIndicatorColor(animatedProgress)
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(180.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
@@ -281,14 +304,14 @@ private fun SignalIndicator(progress: Float) {
             progress = { animatedProgress },
             modifier = Modifier.fillMaxSize(),
             strokeWidth = 12.dp,
-            color = RktGreen,
+            color = indicatorColor, // Cor dinâmica aplicada aqui
             trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
         Text(
             text = "${(animatedProgress * 100).toInt()}%",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = indicatorColor // Cor dinâmica aplicada aqui também
         )
     }
 }

@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import com.example.rktec_middleware.data.dao.LogMapeamentoDao
 import com.example.rktec_middleware.data.model.LogMapeamento
 import com.example.rktec_middleware.data.dao.ColetaDao
+import com.example.rktec_middleware.data.dao.HistoricoDao
 import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.data.dao.LogEdicaoDao
 import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
@@ -19,6 +20,8 @@ import com.example.rktec_middleware.data.model.LogEdicaoItem
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.data.dao.UsuarioDao
+import com.example.rktec_middleware.data.model.ItemSessao
+import com.example.rktec_middleware.data.model.SessaoInventario
 
 @Database(
     entities = [
@@ -28,11 +31,11 @@ import com.example.rktec_middleware.data.dao.UsuarioDao
         LogMapeamento::class,
         Usuario::class,
         LogGerenciamentoUsuario::class,
-        // MODIFICADO: Adicionada a nova entidade à lista do banco de dados.
+        SessaoInventario::class,
+        ItemSessao::class,
         LogEdicaoItem::class
     ],
-    // MODIFICADO: Versão incrementada de 12 para 13 devido à mudança na estrutura.
-    version = 14
+    version = 18
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
@@ -42,6 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun usuarioDao(): UsuarioDao
     abstract fun logGerenciamentoUsuarioDao(): LogGerenciamentoUsuarioDao
     abstract fun logEdicaoDao(): LogEdicaoDao
+    abstract fun historicoDao(): HistoricoDao
 
 
     companion object {

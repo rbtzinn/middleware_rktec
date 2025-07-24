@@ -139,7 +139,6 @@ fun TelaMapeamentoPlanilha(
         }
     }
 }
-// Outros composables privados (InfoCard, CampoMapeamento) permanecem os mesmos
 
 @Composable
 private fun InfoCard(text: String) {
@@ -152,7 +151,6 @@ private fun InfoCard(text: String) {
     }
 }
 
-// SEU COMPONENTE ORIGINAL, AGORA ESTILIZADO E CORRIGIDO
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CampoMapeamento(

@@ -1,19 +1,17 @@
-// ui/screens/TelaLeituraColeta.kt
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.example.rktec_middleware.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,67 +31,69 @@ fun TelaLeituraColeta(
     var isDialogLimparAberto by remember { mutableStateOf(false) }
     var naoMostrarLimpar by remember { mutableStateOf(false) }
 
-    RKTecMiddlewareTheme {
-        Scaffold(
-            topBar = {
-                GradientHeader(
-                    title = "Coleta de Tags",
-                    onVoltar = { isDialogVoltarAberto = true }
-                ) { // Este é o espaço para os ícones de ação
-                    IconButton(onClick = {
-                        if (naoMostrarLimpar || tagList.isEmpty()) {
-                            viewModel.limparTags()
-                        } else {
-                            isDialogLimparAberto = true
-                        }
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Limpar tags", tint = Color.White)
-                    }
-                }
-            }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(bottom = Dimens.PaddingMedium),
-                horizontalAlignment = Alignment.CenterHorizontally
+    Scaffold(
+        topBar = {
+            GradientHeader(
+                title = "Coleta de Tags",
+                onVoltar = { isDialogVoltarAberto = true }
             ) {
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-                Text("Pressione o gatilho para ler", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-                Text("Total de tags lidas: ${tagList.size}", style = MaterialTheme.typography.bodyLarge)
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = Dimens.PaddingMedium),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(Dimens.PaddingExtraSmall)
-                ) {
-                    if (tagList.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nenhuma etiqueta lida ainda", color = RktTextSecondary)
-                        }
+                IconButton(onClick = {
+                    if (naoMostrarLimpar || tagList.isEmpty()) {
+                        viewModel.limparTags()
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(Dimens.PaddingSmall),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
-                        ) {
-                            items(tagList, key = { it.epc }) { tag ->
-                                ColetaTagItem(epc = tag.epc)
-                            }
+                        isDialogLimparAberto = true
+                    }
+                }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Limpar tags", tint = Color.White)
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(bottom = Dimens.PaddingMedium),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+            Text("Pressione o gatilho para ler", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+            Text("Total de tags únicas lidas: ${tagList.size}", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = Dimens.PaddingMedium),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(Dimens.PaddingExtraSmall)
+            ) {
+                if (tagList.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Nenhuma etiqueta lida ainda")
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(Dimens.PaddingSmall),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
+                    ) {
+                        items(tagList, key = { it.epc }) { tag ->
+                            ColetaTagItem(epc = tag.epc)
                         }
                     }
                 }
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-                PrimaryButton(
-                    onClick = onVoltar, // A lógica de limpeza já está no dialog de "voltar"
-                    text = "Finalizar Coleta",
-                    modifier = Modifier.padding(horizontal = Dimens.PaddingMedium)
-                )
             }
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+            PrimaryButton(
+                // AJUSTE: O botão de finalizar agora também abre o diálogo de confirmação
+                onClick = { isDialogVoltarAberto = true },
+                text = "Finalizar Coleta",
+                modifier = Modifier.padding(horizontal = Dimens.PaddingMedium)
+            )
         }
     }
 
@@ -121,7 +121,7 @@ fun TelaLeituraColeta(
             text = {
                 Column {
                     Text("Deseja realmente limpar as tags lidas?")
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { naoMostrarLimpar = !naoMostrarLimpar }) {
                         Checkbox(checked = naoMostrarLimpar, onCheckedChange = { naoMostrarLimpar = it })
                         Text("Não mostrar esta mensagem novamente")
                     }
@@ -137,13 +137,13 @@ fun TelaLeituraColeta(
             shape = MaterialTheme.shapes.large
         )
     }
-}
+} // <-- CORREÇÃO: A chave de fechamento da função foi movida para aqui, englobando os diálogos.
 
 @Composable
 private fun ColetaTagItem(epc: String) {
     Card(
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = RktBlueLight),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -160,7 +160,6 @@ private fun ColetaTagItem(epc: String) {
             Text(
                 text = epc,
                 style = MaterialTheme.typography.bodyLarge,
-                color = RktTextPrimary,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1
             )

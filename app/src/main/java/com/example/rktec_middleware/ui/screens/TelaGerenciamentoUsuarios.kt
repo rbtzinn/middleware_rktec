@@ -25,6 +25,8 @@ import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.components.GradientHeader
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.rktec_middleware.viewmodel.GerenciamentoViewModel
 import com.example.rktec_middleware.ui.components.StandardTextField
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogUtil
@@ -33,23 +35,22 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaGerenciamentoUsuarios(
-    usuarios: List<Usuario>,
-    usuarioRepository: UsuarioRepository,
-    usuarioLogadoEmail: String,
-    context: Context,
-    onAtualizarLista: (String) -> Unit,
+    viewModel: GerenciamentoViewModel = hiltViewModel(),
     onVoltar: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val usuarios by viewModel.usuarios.collectAsState()
+    val usuarioLogadoEmail = viewModel.usuarioLogadoEmail
+
     var editandoUsuario by remember { mutableStateOf<Usuario?>(null) }
     var mostrandoDialogoExcluir by remember { mutableStateOf<Usuario?>(null) }
 
-    RKTecMiddlewareTheme {
+
         Scaffold(
             topBar = {
                 GradientHeader(title = "Gerenciamento de Usuários", onVoltar = onVoltar)
             },
-            containerColor = RktBackground
+            containerColor = MaterialTheme.colorScheme.background
         ) { padding ->
             LazyColumn(
                 modifier = Modifier
@@ -73,16 +74,8 @@ fun TelaGerenciamentoUsuarios(
                     usuario = editandoUsuario!!,
                     onDismiss = { editandoUsuario = null },
                     onConfirm = { usuarioAtualizado ->
-                        scope.launch {
-                            usuarioRepository.atualizarUsuario(usuarioAtualizado)
-                            LogUtil.logAcaoGerenciamentoUsuario(
-                                context = context, usuarioResponsavel = usuarioLogadoEmail, acao = "EDIÇÃO",
-                                usuarioAlvo = usuarioAtualizado.email,
-                                detalhes = "Dados do usuário ${usuarioAtualizado.email} foram atualizados."
-                            )
-                            onAtualizarLista(usuarioAtualizado.email)
-                            editandoUsuario = null
-                        }
+                        viewModel.atualizarUsuario(usuarioAtualizado)
+                        editandoUsuario = null
                     }
                 )
             }
@@ -92,24 +85,14 @@ fun TelaGerenciamentoUsuarios(
                     usuario = mostrandoDialogoExcluir!!,
                     onDismiss = { mostrandoDialogoExcluir = null },
                     onConfirm = { usuario, motivo ->
-                        scope.launch {
-                            val novaAtividade = !usuario.ativo
-                            usuarioRepository.setUsuarioAtivo(usuario.email, novaAtividade)
-                            LogUtil.logAcaoGerenciamentoUsuario(
-                                context = context, usuarioResponsavel = usuarioLogadoEmail,
-                                acao = if (novaAtividade) "REATIVAÇÃO" else "DESATIVAÇÃO",
-                                usuarioAlvo = usuario.email, motivo = motivo,
-                                detalhes = "Status de ${usuario.email} alterado para ${if (novaAtividade) "ativo" else "inativo"}."
-                            )
-                            onAtualizarLista(usuario.email)
-                            mostrandoDialogoExcluir = null
-                        }
+                        viewModel.alternarAtividadeUsuario(usuario, motivo)
+                        mostrandoDialogoExcluir = null
                     }
                 )
             }
         }
     }
-}
+
 
 @Composable
 private fun UsuarioCard(

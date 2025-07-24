@@ -5,7 +5,7 @@ import com.example.rktec_middleware.data.model.Usuario
 
 @Dao
 interface UsuarioDao {
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun inserir(usuario: Usuario)
 
     @Update
@@ -14,18 +14,18 @@ interface UsuarioDao {
     @Delete
     suspend fun deletar(usuario: Usuario)
 
-    @Query("SELECT * FROM Usuario WHERE email = :email LIMIT 1")
+    @Query("SELECT * FROM usuarios WHERE email = :email LIMIT 1")
     suspend fun buscarPorEmail(email: String): Usuario?
 
-    @Query("SELECT * FROM Usuario")
-    suspend fun listarTodos(): List<Usuario>
+    @Query("SELECT * FROM usuarios WHERE companyId = :companyId")
+    suspend fun listarTodosPorEmpresa(companyId: String): List<Usuario>
 
-    @Query("SELECT * FROM Usuario WHERE nome = :nome LIMIT 1")
+    @Query("SELECT * FROM usuarios WHERE nome = :nome LIMIT 1")
     suspend fun buscarPorNome(nome: String): Usuario?
 
-    @Query("SELECT email FROM Usuario")
+    @Query("SELECT email FROM usuarios")
     suspend fun listarEmails(): List<String>
 
-    @Query("UPDATE Usuario SET ativo = :ativo WHERE email = :email")
+    @Query("UPDATE usuarios SET ativo = :ativo WHERE email = :email")
     suspend fun setAtivo(email: String, ativo: Boolean)
 }

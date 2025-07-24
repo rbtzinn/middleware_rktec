@@ -1,38 +1,53 @@
 package com.example.rktec_middleware.viewmodel
 
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 sealed class RecuperarSenhaState {
     object Idle : RecuperarSenhaState()
-    object Enviando : RecuperarSenhaState()
-    object Sucesso : RecuperarSenhaState()
-    data class Erro(val mensagem: String) : RecuperarSenhaState()
+    object Loading : RecuperarSenhaState()
+    object Success : RecuperarSenhaState()
+    data class Error(val message: String) : RecuperarSenhaState()
 }
 
-class RecuperarSenhaViewModel : ViewModel() {
+@HiltViewModel
+class RecuperarSenhaViewModel @Inject constructor() : ViewModel() {
+
     private val _state = MutableStateFlow<RecuperarSenhaState>(RecuperarSenhaState.Idle)
-    val state: StateFlow<RecuperarSenhaState> = _state
+    val state = _state.asStateFlow()
 
-    private val _email = mutableStateOf("")
-    val email: State<String> = _email
+    var emailInicial: String? = null
+        private set
 
-    fun setEmail(newEmail: String) {
-        _email.value = newEmail
+    fun setEmail(email: String?) {
+        if (!email.isNullOrBlank()) {
+            emailInicial = email
+        }
     }
 
     fun enviarResetEmail(email: String) {
-        _state.value = RecuperarSenhaState.Enviando
+        if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            _state.value = RecuperarSenhaState.Error("Por favor, insira um e-mail válido.")
+            return
+        }
+
+        _state.value = RecuperarSenhaState.Loading
         FirebaseAuth.getInstance().sendPasswordResetEmail(email)
             .addOnSuccessListener {
-                _state.value = RecuperarSenhaState.Sucesso
+                _state.value = RecuperarSenhaState.Success
             }
             .addOnFailureListener { e ->
-                _state.value = RecuperarSenhaState.Erro(e.message ?: "Erro ao enviar email!")
+                _state.value = RecuperarSenhaState.Error(e.message ?: "Ocorreu um erro.")
             }
+    }
+
+    fun resetState() {
+        _state.value = RecuperarSenhaState.Idle
     }
 }

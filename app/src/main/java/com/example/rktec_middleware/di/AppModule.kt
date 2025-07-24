@@ -2,6 +2,7 @@ package com.example.rktec_middleware.di
 
 import android.app.Application
 import com.example.rktec_middleware.data.db.AppDatabase
+import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
 import dagger.Module
@@ -30,5 +31,11 @@ object AppModule {
     @Singleton
     fun provideInventarioRepository(db: AppDatabase): InventarioRepository {
         return InventarioRepository(db.inventarioDao())
+    }
+
+    @Provides
+    @Singleton
+    fun provideHistoricoRepository(db: AppDatabase): HistoricoRepository {
+        return HistoricoRepository(db.historicoDao())
     }
 }

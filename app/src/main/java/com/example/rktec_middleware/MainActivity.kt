@@ -27,7 +27,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.TipoUsuario
-import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.ui.screens.*
 import com.example.rktec_middleware.ui.theme.RKTecMiddlewareTheme
@@ -62,7 +61,6 @@ class MainActivity : ComponentActivity() {
             RKTecMiddlewareTheme(themeOption = themeOption) {
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
-                val context = LocalContext.current
 
                 val authViewModel: AuthViewModel = hiltViewModel()
                 val authState by authViewModel.authState.collectAsState()
@@ -73,20 +71,22 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // CORREÇÃO ESTRUTURAL: O 'when' agora tem 3 blocos separados e corretos.
                 when (val state = authState) {
                     is AuthState.Carregando -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
                         }
                     }
+
                     is AuthState.NaoAutenticado -> {
                         NavHost(navController = navController, startDestination = Screen.Autenticacao.route) {
                             composable(Screen.Autenticacao.route) {
                                 FluxoAutenticacao(
-                                    usuarioRepository = usuarioRepository,
                                     aoLoginSucesso = { usuario ->
                                         scope.launch {
-                                            val mapeamento = appDatabase.mapeamentoDao().buscarPrimeiro() != null
+                                            val mapeamento =
+                                                appDatabase.mapeamentoDao().buscarPrimeiro() != null
                                             authViewModel.onLoginSucesso(usuario, mapeamento)
                                         }
                                     }
@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
                     is AuthState.Autenticado -> {
                         val usuarioAutenticado = state.usuario
                         val startDestination = if (state.mapeamentoConcluido) Screen.Principal.route else Screen.Importacao.route
@@ -156,6 +157,7 @@ class MainActivity : ComponentActivity() {
                                             onSobreClick = { navController.navigate(Screen.Sobre.route) },
                                             onGerenciarUsuariosClick = { navController.navigate(Screen.GerenciamentoUsuarios.route) },
                                             onConfiguracoesClick = { navController.navigate(Screen.Configuracoes.route) },
+                                            onHistoricoClick = { navController.navigate(Screen.Historico.route) },
                                             onSairClick = { authViewModel.logout() }
                                         )
                                     }
@@ -169,12 +171,13 @@ class MainActivity : ComponentActivity() {
                             }
 
                             composable(Screen.Checagem.route) {
-                                // CORREÇÃO: TelaChecagem não precisa mais do parâmetro 'banco'.
                                 TelaChecagem(onVoltar = { navController.popBackStack() })
                             }
+
                             composable(Screen.ColetaAvulsa.route) {
                                 TelaLeituraColeta(viewModel = rfidViewModel, onVoltar = { navController.popBackStack() })
                             }
+
                             composable(Screen.Importacao.route) {
                                 TelaImportacao(
                                     onConcluido = {
@@ -185,6 +188,7 @@ class MainActivity : ComponentActivity() {
                                     onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                 )
                             }
+
                             composable(Screen.Inventario.route) {
                                 TelaInventario(
                                     onVoltar = { navController.popBackStack() },
@@ -194,29 +198,35 @@ class MainActivity : ComponentActivity() {
                                     onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                 )
                             }
+
                             composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) {
-                                // CORREÇÃO: Não passa mais 'banco', 'filtroLoja' e 'filtroSetor'.
-                                // O LeituraInventarioViewModel obtém esses dados dos argumentos da rota.
                                 TelaLeituraInventario(
                                     onVoltar = { navController.popBackStack() },
-                                    usuarioLogado = usuarioAutenticado.nome
+                                    usuario = usuarioAutenticado
                                 )
                             }
+
                             composable(Screen.Sobre.route) {
                                 TelaSobre(onVoltar = { navController.popBackStack() })
                             }
+
+                            composable(Screen.Historico.route) {
+                                TelaHistorico(
+                                    onVoltar = { navController.popBackStack() },
+                                    onSessaoClick = { sessaoId ->
+                                        navController.navigate(Screen.DetalheHistorico.createRoute(sessaoId))
+                                    }
+                                )
+                            }
+
+                            composable(route = Screen.DetalheHistorico.route, arguments = Screen.DetalheHistorico.arguments) {
+                                TelaDetalheHistorico(
+                                    onVoltar = { navController.popBackStack() }
+                                )
+                            }
+
                             composable(Screen.GerenciamentoUsuarios.route) {
-                                var usuarios by remember { mutableStateOf<List<Usuario>>(emptyList()) }
-                                LaunchedEffect(Unit) { usuarios = usuarioRepository.listarTodos() }
                                 TelaGerenciamentoUsuarios(
-                                    usuarios = usuarios.distinctBy { it.email },
-                                    onAtualizarLista = {
-                                        scope.launch { usuarios = usuarioRepository.listarTodos() }
-                                        authViewModel.recarregarUsuario()
-                                    },
-                                    usuarioRepository = usuarioRepository,
-                                    usuarioLogadoEmail = usuarioAutenticado.email,
-                                    context = context,
                                     onVoltar = { navController.popBackStack() }
                                 )
                             }

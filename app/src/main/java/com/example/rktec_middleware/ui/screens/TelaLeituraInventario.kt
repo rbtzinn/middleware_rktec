@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.theme.*
 import com.example.rktec_middleware.util.LogHelper
@@ -58,7 +59,7 @@ private fun StatusInventario.toIcon() = when (this) {
 @Composable
 fun TelaLeituraInventario(
     onVoltar: () -> Unit,
-    usuarioLogado: String,
+    usuario: Usuario,
     rfidViewModel: RfidViewModel = hiltViewModel(),
     leituraViewModel: LeituraInventarioViewModel = hiltViewModel()
 ) {
@@ -72,107 +73,107 @@ fun TelaLeituraInventario(
     val filtroLoja = leituraViewModel.filtroLoja
     val filtroSetor = leituraViewModel.filtroSetor
 
-    RKTecMiddlewareTheme {
-        Scaffold(
-            topBar = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                0f to MaterialTheme.colorScheme.primaryContainer,
-                                1f to MaterialTheme.colorScheme.primary
-                            )
-                        )
-                )
-            },
-            containerColor = MaterialTheme.colorScheme.background
-        ) { paddingValues ->
-            Column(
+    Scaffold(
+        topBar = {
+            Box(
                 modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-                    .padding(bottom = Dimens.PaddingMedium),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to MaterialTheme.colorScheme.primaryContainer,
+                            1f to MaterialTheme.colorScheme.primary
+                        )
+                    )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .padding(bottom = Dimens.PaddingMedium),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+            Text(
+                "Pressione o gatilho para ler",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
+            Text(
+                "Lidos: ${tagsLidas.size} / Esperado: ${listaFiltrada.size}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+
+            Card(
+                shape = MaterialTheme.shapes.medium,
+                elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingExtraSmall),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = Dimens.PaddingMedium)
             ) {
-                Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
-                Text(
-                    "Pressione o gatilho para ler",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
-                Text(
-                    "Lidos: ${tagsLidas.size} / Esperado: ${listaFiltrada.size}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+                if (tagsLidas.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Nenhuma etiqueta lida ainda")
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(Dimens.PaddingSmall),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
+                    ) {
+                        items(tagsLidas, key = { it.epc }) { tag ->
+                            val status = statusTag(tag.epc, filtroLoja, listaFiltrada, listaTotal)
 
-                Card(
-                    shape = MaterialTheme.shapes.medium,
-                    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingExtraSmall),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = Dimens.PaddingMedium)
-                ) {
-                    if (tagsLidas.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nenhuma etiqueta lida ainda", color = RktTextSecondary)
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(Dimens.PaddingSmall),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)
-                        ) {
-                            items(tagsLidas, key = { it.epc }) { tag ->
-                                val status = statusTag(tag.epc, filtroLoja, listaFiltrada, listaTotal)
-
-                                if (status == StatusInventario.AMARELO && filtroSetor != null && tag.epc !in tagsCorrigidasNaSessao) {
-                                    LaunchedEffect(tag.epc) {
-                                        leituraViewModel.corrigirSetor(tag.epc, filtroSetor)
-                                        tagsCorrigidasNaSessao.add(tag.epc)
-                                    }
+                            if (status == StatusInventario.AMARELO && filtroSetor != null && tag.epc !in tagsCorrigidasNaSessao) {
+                                LaunchedEffect(tag.epc) {
+                                    leituraViewModel.corrigirSetor(tag.epc, filtroSetor)
+                                    tagsCorrigidasNaSessao.add(tag.epc)
                                 }
-
-                                val itemFoiCorrigido = tag.epc in tagsCorrigidasNaSessao
-                                val statusFinal = if (itemFoiCorrigido) StatusInventario.CORRIGIDO else status
-
-                                TagLidaItem(epc = tag.epc, status = statusFinal)
-                                Divider(color = RktBackground)
                             }
+
+                            val itemFoiCorrigido = tag.epc in tagsCorrigidasNaSessao
+                            val statusFinal = if (itemFoiCorrigido) StatusInventario.CORRIGIDO else status
+
+                            TagLidaItem(epc = tag.epc, status = statusFinal)
+                            Divider(color = MaterialTheme.colorScheme.background)
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
-
-                PrimaryButton(
-                    onClick = {
-                        scope.launch {
-                            val arquivoLog = LogHelper.registrarSessaoDeInventario(
-                                context = context, usuario = usuarioLogado, loja = filtroLoja,
-                                setor = filtroSetor, itensEsperados = listaFiltrada,
-                                itensLidos = tagsLidas, itensTotaisDaBase = listaTotal
-                            )
-                            Toast.makeText(
-                                context,
-                                if (arquivoLog != null) "Sessão registrada no log: ${arquivoLog.name}"
-                                else "Falha ao registrar a sessão.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                        onVoltar()
-                    },
-                    text = "Finalizar Sessão",
-                    modifier = Modifier.padding(horizontal = Dimens.PaddingMedium)
-                )
             }
+
+            Spacer(modifier = Modifier.height(Dimens.PaddingMedium))
+
+            PrimaryButton(
+                onClick = {
+                    scope.launch {
+                        // CORREÇÃO 2: Passando o nome do usuário para o log em arquivo
+                        val arquivoLog = LogHelper.registrarSessaoDeInventario(
+                            context = context, usuario = usuario.nome, loja = filtroLoja,
+                            setor = filtroSetor, itensEsperados = listaFiltrada,
+                            itensLidos = tagsLidas, itensTotaisDaBase = listaTotal
+                        )
+                        Toast.makeText(
+                            context,
+                            if (arquivoLog != null) "Sessão registrada no log: ${arquivoLog.name}"
+                            else "Falha ao registrar a sessão.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    leituraViewModel.finalizarEsalvarSessao(usuario, tagsLidas)
+                    onVoltar()
+                },
+                text = "Finalizar Sessão",
+                modifier = Modifier.padding(horizontal = Dimens.PaddingMedium)
+            )
         }
     }
 }
