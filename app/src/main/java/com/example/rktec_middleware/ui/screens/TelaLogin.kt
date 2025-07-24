@@ -55,114 +55,111 @@ fun TelaLogin(
         }
     }
 
-    RKTecMiddlewareTheme {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        AuthHeader(
+            title = "Bem-vindo ao Middleware",
+            subtitle = "Faça login para continuar"
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(horizontal = Dimens.PaddingLarge),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            AuthHeader(
-                title = "Bem-vindo ao Middleware",
-                subtitle = "Faça login para continuar"
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = Dimens.PaddingLarge),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box {
-                    StandardTextField(
-                        value = usuario,
-                        onValueChange = {
-                            usuario = it
-                            showSuggestions = it.isNotBlank()
-                        },
-                        label = "E-mail",
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = "E-mail") }
-                    )
-                    if (showSuggestions && filteredSuggestions.isNotEmpty()) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 60.dp),
-                            shape = MaterialTheme.shapes.medium,
-                            elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingSmall)
-                        ) {
-                            Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
-                                filteredSuggestions.forEach { suggestion ->
-                                    Text(
-                                        text = suggestion,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                usuario = suggestion
-                                                showSuggestions = false
-                                            }
-                                            .padding(Dimens.PaddingMedium),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = RktTextPrimary
-                                    )
-                                }
+            Box {
+                StandardTextField(
+                    value = usuario,
+                    onValueChange = {
+                        usuario = it
+                        showSuggestions = it.isNotBlank()
+                    },
+                    label = "E-mail",
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = "E-mail") }
+                )
+                if (showSuggestions && filteredSuggestions.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 60.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.PaddingSmall)
+                    ) {
+                        Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                            filteredSuggestions.forEach { suggestion ->
+                                Text(
+                                    text = suggestion,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            usuario = suggestion
+                                            showSuggestions = false
+                                        }
+                                        .padding(Dimens.PaddingMedium),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
                             }
                         }
                     }
                 }
+            }
 
-                Spacer(Modifier.height(Dimens.PaddingMedium))
+            Spacer(Modifier.height(Dimens.PaddingMedium))
 
-                StandardTextField(
-                    value = senha,
-                    onValueChange = { senha = it },
-                    label = "Senha",
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Senha") },
-                    visualTransformation = if (senhaVisivel) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { senhaVisivel = !senhaVisivel }) {
-                            Icon(
-                                imageVector = if (senhaVisivel) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (senhaVisivel) "Ocultar senha" else "Mostrar senha"
-                            )
-                        }
+            StandardTextField(
+                value = senha,
+                onValueChange = { senha = it },
+                label = "Senha",
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Senha") },
+                visualTransformation = if (senhaVisivel) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { senhaVisivel = !senhaVisivel }) {
+                        Icon(
+                            imageVector = if (senhaVisivel) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (senhaVisivel) "Ocultar senha" else "Mostrar senha"
+                        )
                     }
-                )
-
-                Spacer(Modifier.height(Dimens.PaddingSmall))
-
-                TextButton(
-                    onClick = { onEsqueciSenha(usuario) },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Esqueci minha senha", color = RktTextSecondary)
                 }
+            )
 
-                Spacer(Modifier.height(Dimens.PaddingLarge))
+            Spacer(Modifier.height(Dimens.PaddingSmall))
 
-                PrimaryButton(
-                    onClick = { viewModel.autenticar(usuario.trim(), senha) },
-                    text = "Entrar",
-                    enabled = usuario.isNotBlank() && senha.isNotBlank() && loginState !is LoginState.Loading
-                )
+            TextButton(
+                onClick = { onEsqueciSenha(usuario) },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Esqueci minha senha")
+            }
 
-                erroMsg?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = Dimens.PaddingMedium)
-                    )
-                }
+            Spacer(Modifier.height(Dimens.PaddingLarge))
 
-                Spacer(Modifier.height(Dimens.PaddingMedium))
+            PrimaryButton(
+                onClick = { viewModel.autenticar(usuario.trim(), senha) },
+                text = "Entrar",
+                enabled = usuario.isNotBlank() && senha.isNotBlank() && loginState !is LoginState.Loading
+            )
 
-                SecondaryTextButton(
-                    onClick = onIrParaCadastro,
-                    text = "Criar nova conta"
+            erroMsg?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = Dimens.PaddingMedium)
                 )
             }
+
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+
+            SecondaryTextButton(
+                onClick = onIrParaCadastro,
+                text = "Criar nova conta"
+            )
         }
     }
 }

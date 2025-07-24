@@ -10,6 +10,7 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
     object Autenticacao : Screen("autenticacao")
     object Principal : Screen("principal")
     object Importacao : Screen("importacao")
+    object Configuracoes : Screen("configuracoes")
     object Inventario : Screen("inventario")
     object Checagem : Screen("checagem")
     object ColetaAvulsa : Screen("coleta_avulsa")

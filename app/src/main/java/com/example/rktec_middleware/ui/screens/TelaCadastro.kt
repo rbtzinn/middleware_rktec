@@ -42,110 +42,108 @@ fun TelaCadastro(
         }
     }
 
-    RKTecMiddlewareTheme {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        AuthHeader(
+            title = "Crie sua conta",
+            subtitle = "Cadastre-se para usar o Middleware"
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.PaddingLarge)
+                .weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            AuthHeader(
-                title = "Crie sua conta",
-                subtitle = "Cadastre-se para usar o Middleware"
+            StandardTextField(
+                value = nome,
+                onValueChange = { nome = it },
+                label = "Nome completo",
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Nome de usuário") }
+            )
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+            StandardTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = "E-mail",
+                leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = "E-mail") }
+            )
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+            StandardTextField(
+                value = senha,
+                onValueChange = { senha = it },
+                label = "Senha",
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Senha") },
+                visualTransformation = if (senhaVisivel) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { senhaVisivel = !senhaVisivel }) {
+                        Icon(
+                            imageVector = if (senhaVisivel) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (senhaVisivel) "Ocultar senha" else "Mostrar senha"
+                        )
+                    }
+                }
+            )
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+            StandardTextField(
+                value = confirmacao,
+                onValueChange = { confirmacao = it },
+                label = "Confirme a senha",
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Confirme a senha") },
+                visualTransformation = if (confirmacaoVisivel) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { confirmacaoVisivel = !confirmacaoVisivel }) {
+                        Icon(
+                            imageVector = if (confirmacaoVisivel) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = if (confirmacaoVisivel) "Ocultar senha" else "Mostrar senha"
+                        )
+                    }
+                }
+            )
+            Spacer(Modifier.height(Dimens.PaddingLarge))
+
+            PrimaryButton(
+                onClick = {
+                    mostrarErro = null
+                    when {
+                        nome.isBlank() || email.isBlank() || senha.isBlank() || confirmacao.isBlank() ->
+                            mostrarErro = "Preencha todos os campos!"
+                        senha.length < 6 ->
+                            mostrarErro = "A senha deve ter pelo menos 6 caracteres."
+                        !senha.any { it.isDigit() } ->
+                            mostrarErro = "A senha deve conter pelo menos um número."
+                        !senha.any { it.isLetter() } ->
+                            mostrarErro = "A senha deve conter pelo menos uma letra."
+                        senha != confirmacao ->
+                            mostrarErro = "As senhas não conferem!"
+                        else -> {
+                            val primeiroNome = nome.trim().split(" ").first()
+                            cadastroViewModel.cadastrar(primeiroNome, email.trim(), senha)
+                        }
+                    }
+                },
+                text = "Cadastrar",
+                enabled = cadastroState !is CadastroState.Loading
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Dimens.PaddingLarge)
-                    .weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                StandardTextField(
-                    value = nome,
-                    onValueChange = { nome = it },
-                    label = "Nome completo",
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = "Nome de usuário") }
-                )
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-                StandardTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = "E-mail",
-                    leadingIcon = { Icon(Icons.Default.MailOutline, contentDescription = "E-mail") }
-                )
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-                StandardTextField(
-                    value = senha,
-                    onValueChange = { senha = it },
-                    label = "Senha",
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Senha") },
-                    visualTransformation = if (senhaVisivel) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { senhaVisivel = !senhaVisivel }) {
-                            Icon(
-                                imageVector = if (senhaVisivel) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (senhaVisivel) "Ocultar senha" else "Mostrar senha"
-                            )
-                        }
-                    }
-                )
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-                StandardTextField(
-                    value = confirmacao,
-                    onValueChange = { confirmacao = it },
-                    label = "Confirme a senha",
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Confirme a senha") },
-                    visualTransformation = if (confirmacaoVisivel) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { confirmacaoVisivel = !confirmacaoVisivel }) {
-                            Icon(
-                                imageVector = if (confirmacaoVisivel) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (confirmacaoVisivel) "Ocultar senha" else "Mostrar senha"
-                            )
-                        }
-                    }
-                )
-                Spacer(Modifier.height(Dimens.PaddingLarge))
-
-                PrimaryButton(
-                    onClick = {
-                        mostrarErro = null
-                        when {
-                            nome.isBlank() || email.isBlank() || senha.isBlank() || confirmacao.isBlank() ->
-                                mostrarErro = "Preencha todos os campos!"
-                            senha.length < 6 ->
-                                mostrarErro = "A senha deve ter pelo menos 6 caracteres."
-                            !senha.any { it.isDigit() } ->
-                                mostrarErro = "A senha deve conter pelo menos um número."
-                            !senha.any { it.isLetter() } ->
-                                mostrarErro = "A senha deve conter pelo menos uma letra."
-                            senha != confirmacao ->
-                                mostrarErro = "As senhas não conferem!"
-                            else -> {
-                                val primeiroNome = nome.trim().split(" ").first()
-                                cadastroViewModel.cadastrar(primeiroNome, email.trim(), senha)
-                            }
-                        }
-                    },
-                    text = "Cadastrar",
-                    enabled = cadastroState !is CadastroState.Loading
-                )
-
-                mostrarErro?.let {
-                    Text(
-                        it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = Dimens.PaddingSmall)
-                    )
-                }
-                Spacer(Modifier.height(Dimens.PaddingMedium))
-                SecondaryTextButton(
-                    onClick = aoVoltarLogin,
-                    text = "Já tenho uma conta"
+            mostrarErro?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = Dimens.PaddingSmall)
                 )
             }
+            Spacer(Modifier.height(Dimens.PaddingMedium))
+            SecondaryTextButton(
+                onClick = aoVoltarLogin,
+                text = "Já tenho uma conta"
+            )
         }
     }
 }

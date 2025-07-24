@@ -33,6 +33,7 @@ import com.example.rktec_middleware.ui.screens.*
 import com.example.rktec_middleware.ui.theme.RKTecMiddlewareTheme
 import com.example.rktec_middleware.viewmodel.AuthState
 import com.example.rktec_middleware.viewmodel.AuthViewModel
+import com.example.rktec_middleware.viewmodel.MainViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -55,7 +56,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            RKTecMiddlewareTheme {
+            val mainViewModel: MainViewModel = hiltViewModel()
+            val themeOption by mainViewModel.themeOption.collectAsState()
+
+            RKTecMiddlewareTheme(themeOption = themeOption) {
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
                 val context = LocalContext.current
@@ -144,7 +148,6 @@ class MainActivity : ComponentActivity() {
                                             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                                             .then(dragModifier)
                                     ) {
-                                        // CORREÇÃO: TelaPrincipal não precisa mais de usuarioDao e usuarioRepository
                                         TelaPrincipal(
                                             authViewModel = authViewModel,
                                             onInventarioClick = { navController.navigate(Screen.Inventario.route) },
@@ -152,10 +155,17 @@ class MainActivity : ComponentActivity() {
                                             onColetaAvulsaClick = { navController.navigate(Screen.ColetaAvulsa.route) },
                                             onSobreClick = { navController.navigate(Screen.Sobre.route) },
                                             onGerenciarUsuariosClick = { navController.navigate(Screen.GerenciamentoUsuarios.route) },
+                                            onConfiguracoesClick = { navController.navigate(Screen.Configuracoes.route) },
                                             onSairClick = { authViewModel.logout() }
                                         )
                                     }
                                 }
+                            }
+
+                            composable(Screen.Configuracoes.route) {
+                                TelaConfiguracoes(
+                                    onVoltar = { navController.popBackStack() }
+                                )
                             }
 
                             composable(Screen.Checagem.route) {

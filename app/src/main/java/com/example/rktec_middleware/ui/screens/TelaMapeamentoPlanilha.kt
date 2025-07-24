@@ -71,76 +71,75 @@ fun TelaMapeamentoPlanilha(
     val colunas = dadosBrutos?.first ?: emptyList()
     val isLoading = isReadingFile || mapeamentoState is MapeamentoState.Loading
 
-    RKTecMiddlewareTheme {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Mapeamento de Planilha") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Mapeamento de Planilha") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+            )
+        }
+    ) { innerPadding ->
+        if (isReadingFile) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+                Text("Lendo arquivo...", modifier = Modifier.padding(top = 80.dp))
             }
-        ) { innerPadding ->
-            if (isReadingFile) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                    Text("Lendo arquivo...", modifier = Modifier.padding(top = 80.dp))
-                }
-            } else {
+        } else {
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
                 Column(
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .background(MaterialTheme.colorScheme.background)
+                    modifier = Modifier.padding(Dimens.PaddingMedium),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(Dimens.PaddingMedium),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
-                    ) {
-                        InfoCard("Selecione a correspondência entre as colunas do arquivo e os campos do sistema.")
+                    InfoCard("Selecione a correspondência entre as colunas do arquivo e os campos do sistema.")
 
-                        Card(
-                            shape = MaterialTheme.shapes.large,
-                            elevation = CardDefaults.cardElevation(Dimens.PaddingExtraSmall),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(Modifier.padding(Dimens.PaddingLarge), verticalArrangement = Arrangement.spacedBy(Dimens.PaddingLarge)) {
-                                CampoMapeamento(titulo = "Coluna do EPC*", descricao = "Identificador único do ativo.", colunas = colunas, selecionado = indexEpc, onSelecionado = { indexEpc = it })
-                                CampoMapeamento(titulo = "Coluna do Nome/Descrição", descricao = "Nome descritivo do ativo.", colunas = colunas, selecionado = indexNome, onSelecionado = { indexNome = it })
-                                CampoMapeamento(titulo = "Coluna do Setor", descricao = "Localização física do ativo.", colunas = colunas, selecionado = indexSetor, onSelecionado = { indexSetor = it })
-                                CampoMapeamento(titulo = "Coluna da Loja", descricao = "Unidade empresarial do ativo.", colunas = colunas, selecionado = indexLoja, onSelecionado = { indexLoja = it })
-                            }
+                    Card(
+                        shape = MaterialTheme.shapes.large,
+                        elevation = CardDefaults.cardElevation(Dimens.PaddingExtraSmall),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(Modifier.padding(Dimens.PaddingLarge), verticalArrangement = Arrangement.spacedBy(Dimens.PaddingLarge)) {
+                            CampoMapeamento(titulo = "Coluna do EPC*", descricao = "Identificador único do ativo.", colunas = colunas, selecionado = indexEpc, onSelecionado = { indexEpc = it })
+                            CampoMapeamento(titulo = "Coluna do Nome/Descrição", descricao = "Nome descritivo do ativo.", colunas = colunas, selecionado = indexNome, onSelecionado = { indexNome = it })
+                            CampoMapeamento(titulo = "Coluna do Setor", descricao = "Localização física do ativo.", colunas = colunas, selecionado = indexSetor, onSelecionado = { indexSetor = it })
+                            CampoMapeamento(titulo = "Coluna da Loja", descricao = "Unidade empresarial do ativo.", colunas = colunas, selecionado = indexLoja, onSelecionado = { indexLoja = it })
                         }
                     }
+                }
 
-                    Spacer(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
 
-                    Column(Modifier.padding(Dimens.PaddingMedium), horizontalAlignment = Alignment.CenterHorizontally) {
-                        PrimaryButton(
-                            onClick = {
-                                viewModel.processarEsalvarDados(
-                                    usuario = usuarioLogado,
-                                    uri = uri,
-                                    dadosBrutos = dadosBrutos,
-                                    indexEpc = indexEpc,
-                                    indexNome = indexNome,
-                                    indexSetor = indexSetor,
-                                    indexLoja = indexLoja
-                                )
-                            },
-                            text = if (isLoading) "Processando..." else "Confirmar e Importar",
-                            enabled = indexEpc != null && !isLoading
-                        )
-                        SecondaryTextButton(onClick = onCancelar, text = "Cancelar")
-                    }
+                Column(Modifier.padding(Dimens.PaddingMedium), horizontalAlignment = Alignment.CenterHorizontally) {
+                    PrimaryButton(
+                        onClick = {
+                            viewModel.processarEsalvarDados(
+                                usuario = usuarioLogado,
+                                uri = uri,
+                                dadosBrutos = dadosBrutos,
+                                indexEpc = indexEpc,
+                                indexNome = indexNome,
+                                indexSetor = indexSetor,
+                                indexLoja = indexLoja
+                            )
+                        },
+                        text = if (isLoading) "Processando..." else "Confirmar e Importar",
+                        enabled = indexEpc != null && !isLoading
+                    )
+                    SecondaryTextButton(onClick = onCancelar, text = "Cancelar")
                 }
             }
         }
     }
 }
+// Outros composables privados (InfoCard, CampoMapeamento) permanecem os mesmos
 
 @Composable
 private fun InfoCard(text: String) {

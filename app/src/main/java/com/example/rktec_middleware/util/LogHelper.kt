@@ -4,8 +4,12 @@ import android.content.Context
 import android.os.Environment
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.EpcTag
+import com.example.rktec_middleware.data.model.ExportProgress
 import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.json.JSONArray
 import java.io.File
@@ -15,50 +19,74 @@ import java.util.*
 
 object LogHelper {
 
-    // --- FUNÇÃO 1: EXPORTAR A PLANILHA MESTRE ATUALIZADA ---
-    suspend fun exportarPlanilhaCompleta(context: Context, banco: AppDatabase): File? {
-        try {
-            val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
-            val jsonCabecalho = prefs.getString("cabecalho_original", null) ?: return null
-            val cabecalhoOriginal = mutableListOf<String>().apply {
-                val jsonArray = JSONArray(jsonCabecalho)
-                for (i in 0 until jsonArray.length()) add(jsonArray.getString(i))
-            }
-            val mapeamento = banco.mapeamentoDao().buscarPrimeiro() ?: return null
-            val todosOsItens = banco.inventarioDao().listarTodos()
+    // --- FUNÇÃO 1: EXPORTAR A PLANILHA (AGORA COM FLOW DE PROGRESSO) ---
+    // MUDANÇA: A função agora retorna um Flow<ExportProgress> e não é mais 'suspend'.
+    fun exportarPlanilhaCompleta(context: Context, banco: AppDatabase): Flow<ExportProgress> = flow {
+        // MUDANÇA: Emite o estado inicial de 0%
+        emit(ExportProgress.InProgress(0))
 
-            val workbook = XSSFWorkbook()
-            val sheetInventario = workbook.createSheet("Inventário Final")
-
-            val headerRowInventario = sheetInventario.createRow(0)
-            cabecalhoOriginal.forEachIndexed { index, nomeColuna ->
-                headerRowInventario.createCell(index).setCellValue(nomeColuna)
-            }
-            todosOsItens.forEachIndexed { index, item ->
-                val row = sheetInventario.createRow(index + 1)
-                cabecalhoOriginal.forEachIndexed { colIndex, nomeColuna ->
-                    val valor = when (cabecalhoOriginal.indexOf(nomeColuna)) {
-                        mapeamento.colunaEpc -> item.tag
-                        mapeamento.colunaNome -> item.desc
-                        mapeamento.colunaSetor -> item.localizacao
-                        mapeamento.colunaLoja -> item.loja
-                        else -> item.colunasExtras[nomeColuna] ?: ""
-                    }
-                    row.createCell(colIndex).setCellValue(valor)
-                }
-            }
-
-            val timestamp = SimpleDateFormat("dd-MM-yyyy_HH-mm", Locale.getDefault()).format(Date())
-            val nomeArquivo = "planilha_final_inventario_${timestamp}.xlsx"
-
-            val pasta = criarPastaRelatorios(context)
-            val file = File(pasta, nomeArquivo)
-            FileOutputStream(file).use { workbook.write(it) }
-            workbook.close()
-            return file
-        } catch (e: Exception) {
-            e.printStackTrace(); return null
+        val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
+        val jsonCabecalho = prefs.getString("cabecalho_original", null)
+        if (jsonCabecalho == null) {
+            emit(ExportProgress.Error("Cabeçalho original não encontrado."))
+            return@flow
         }
+
+        val cabecalhoOriginal = mutableListOf<String>().apply {
+            val jsonArray = JSONArray(jsonCabecalho)
+            for (i in 0 until jsonArray.length()) add(jsonArray.getString(i))
+        }
+        val mapeamento = banco.mapeamentoDao().buscarPrimeiro()
+        if (mapeamento == null) {
+            emit(ExportProgress.Error("Mapeamento da planilha não encontrado."))
+            return@flow
+        }
+
+        val todosOsItens = banco.inventarioDao().listarTodos()
+        val totalDeItens = todosOsItens.size
+        if (totalDeItens == 0) {
+            emit(ExportProgress.Error("Nenhum item no inventário para exportar."))
+            return@flow
+        }
+
+        val workbook = XSSFWorkbook()
+        val sheetInventario = workbook.createSheet("Inventário Final")
+
+        val headerRowInventario = sheetInventario.createRow(0)
+        cabecalhoOriginal.forEachIndexed { index, nomeColuna ->
+            headerRowInventario.createCell(index).setCellValue(nomeColuna)
+        }
+
+        // MUDANÇA: O loop principal agora calcula e emite o progresso.
+        todosOsItens.forEachIndexed { index, item ->
+            val row = sheetInventario.createRow(index + 1)
+            cabecalhoOriginal.forEachIndexed { colIndex, nomeColuna ->
+                val valor = when (cabecalhoOriginal.indexOf(nomeColuna)) {
+                    mapeamento.colunaEpc -> item.tag
+                    mapeamento.colunaNome -> item.desc
+                    mapeamento.colunaSetor -> item.localizacao
+                    mapeamento.colunaLoja -> item.loja
+                    else -> item.colunasExtras[nomeColuna] ?: ""
+                }
+                row.createCell(colIndex).setCellValue(valor)
+            }
+            val progresso = (((index + 1) / totalDeItens.toFloat()) * 100).toInt()
+            emit(ExportProgress.InProgress(progresso))
+        }
+
+        val timestamp = SimpleDateFormat("dd-MM-yyyy_HH-mm", Locale.getDefault()).format(Date())
+        val nomeArquivo = "planilha_final_inventario_${timestamp}.xlsx"
+
+        val pasta = criarPastaRelatorios(context)
+        val file = File(pasta, nomeArquivo)
+        FileOutputStream(file).use { workbook.write(it) }
+        workbook.close()
+
+        emit(ExportProgress.Success(file))
+
+    }.catch { e ->
+        e.printStackTrace()
+        emit(ExportProgress.Error(e.message ?: "Ocorreu um erro desconhecido durante a exportação."))
     }
 
     // --- FUNÇÃO 2: EXPORTAR APENAS O LOG DE EDIÇÕES MANUAIS ---

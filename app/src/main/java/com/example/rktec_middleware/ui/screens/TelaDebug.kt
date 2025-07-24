@@ -59,101 +59,99 @@ fun TelaDebug(
         }
     }
 
-    RKTecMiddlewareTheme {
-        Scaffold(
-            topBar = {
-                GradientHeader(title = "Consulta e Edição", onVoltar = onVoltar)
-            }
-        ) { paddingValues ->
-            Column(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(Dimens.PaddingMedium),
-                verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
-            ) {
-                StandardTextField(
-                    value = textoBusca,
-                    onValueChange = { textoBusca = it },
-                    label = "Buscar por EPC, nome, loja ou setor",
-                    leadingIcon = { Icon(Icons.Default.Search, "Buscar") }
-                )
+    Scaffold(
+        topBar = {
+            GradientHeader(title = "Consulta e Edição", onVoltar = onVoltar)
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(Dimens.PaddingMedium),
+            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
+        ) {
+            StandardTextField(
+                value = textoBusca,
+                onValueChange = { textoBusca = it },
+                label = "Buscar por EPC, nome, loja ou setor",
+                leadingIcon = { Icon(Icons.Default.Search, "Buscar") }
+            )
 
-                Card(
-                    shape = MaterialTheme.shapes.medium,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    Column(Modifier.padding(Dimens.PaddingMedium)) {
-                        Text(
-                            "Total de itens: ${inventarioFiltrado.size} / ${inventarioCompleto.size}",
-                            style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(Dimens.PaddingSmall))
-                        if (inventarioCompleto.isEmpty()) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("Nenhum item de inventário importado.", color = RktTextSecondary)
-                            }
-                        } else {
-                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
-                                items(inventarioFiltrado, key = { it.tag }) { item ->
-                                    ItemDebugCard(item) { itemEditando = item }
-                                }
+            Card(
+                shape = MaterialTheme.shapes.medium,
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                Column(Modifier.padding(Dimens.PaddingMedium)) {
+                    Text(
+                        "Total de itens: ${inventarioFiltrado.size} / ${inventarioCompleto.size}",
+                        style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(Dimens.PaddingSmall))
+                    if (inventarioCompleto.isEmpty()) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Nenhum item de inventário importado.", color = RktTextSecondary)
+                        }
+                    } else {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                            items(inventarioFiltrado, key = { it.tag }) { item ->
+                                ItemDebugCard(item) { itemEditando = item }
                             }
                         }
                     }
                 }
-                Button(
-                    onClick = { mostrarDialogLimparBanco = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(Dimens.ComponentHeight),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Limpar Banco de Dados", style = MaterialTheme.typography.labelLarge)
-                }
+            }
+            Button(
+                onClick = { mostrarDialogLimparBanco = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(Dimens.ComponentHeight),
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Limpar Banco de Dados", style = MaterialTheme.typography.labelLarge)
             }
         }
+    }
 
-        if (itemEditando != null) {
-            DialogEditarItemDebug(
-                item = itemEditando!!,
-                lojasDisponiveis = listasParaDropdown.first,
-                setoresDisponiveis = listasParaDropdown.second,
-                onDismiss = { itemEditando = null },
-                onConfirm = { itemAtualizado ->
-                    viewModel.atualizarItem(itemAtualizado)
-                    Toast.makeText(context, "Item atualizado!", Toast.LENGTH_SHORT).show()
-                    itemEditando = null
-                }
-            )
-        }
+    if (itemEditando != null) {
+        DialogEditarItemDebug(
+            item = itemEditando!!,
+            lojasDisponiveis = listasParaDropdown.first,
+            setoresDisponiveis = listasParaDropdown.second,
+            onDismiss = { itemEditando = null },
+            onConfirm = { itemAtualizado ->
+                viewModel.atualizarItem(itemAtualizado)
+                Toast.makeText(context, "Item atualizado!", Toast.LENGTH_SHORT).show()
+                itemEditando = null
+            }
+        )
+    }
 
-        if (mostrarDialogLimparBanco) {
-            AlertDialog(
-                onDismissRequest = { mostrarDialogLimparBanco = false },
-                icon = { Icon(Icons.Default.Warning, "Atenção", tint = RktRed) },
-                title = { Text("Limpar TODOS os dados?") },
-                text = { Text("Isso vai apagar todo o inventário, coletas, logs e mapeamentos. A ação não pode ser desfeita.") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.limparBanco()
-                            onBancoLimpo()
-                            mostrarDialogLimparBanco = false
-                            Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = RktRed)
-                    ) { Text("APAGAR TUDO") }
-                },
-                dismissButton = { OutlinedButton(onClick = { mostrarDialogLimparBanco = false }) { Text("Cancelar") } }
-            )
-        }
+    if (mostrarDialogLimparBanco) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogLimparBanco = false },
+            icon = { Icon(Icons.Default.Warning, "Atenção", tint = RktRed) },
+            title = { Text("Limpar TODOS os dados?") },
+            text = { Text("Isso vai apagar todo o inventário, coletas, logs e mapeamentos. A ação não pode ser desfeita.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.limparBanco()
+                        onBancoLimpo()
+                        mostrarDialogLimparBanco = false
+                        Toast.makeText(context, "Banco de dados limpo.", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RktRed)
+                ) { Text("APAGAR TUDO") }
+            },
+            dismissButton = { OutlinedButton(onClick = { mostrarDialogLimparBanco = false }) { Text("Cancelar") } }
+        )
     }
 }
 
