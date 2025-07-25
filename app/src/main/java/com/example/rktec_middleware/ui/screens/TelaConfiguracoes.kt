@@ -1,12 +1,14 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
-
 package com.example.rktec_middleware.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Vibration
@@ -21,22 +23,58 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ThemeOption
 import com.example.rktec_middleware.ui.components.GradientHeader
 import com.example.rktec_middleware.ui.theme.Dimens
+import com.example.rktec_middleware.viewmodel.AuthViewModel
 import com.example.rktec_middleware.viewmodel.ConfiguracoesViewModel
 import kotlin.math.roundToInt
 
 @Composable
 fun TelaConfiguracoes(
     onVoltar: () -> Unit,
+    authViewModel: AuthViewModel,
     viewModel: ConfiguracoesViewModel = hiltViewModel()
 ) {
     val rfIdPower by viewModel.rfIdPower.collectAsState()
     val soundEnabled by viewModel.soundFeedbackEnabled.collectAsState()
     val vibrationEnabled by viewModel.vibrationFeedbackEnabled.collectAsState()
     val themeOption by viewModel.themeOption.collectAsState()
+    var mostrarDialogLogout by remember { mutableStateOf(false) }
+
+    if (mostrarDialogLogout) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogLogout = false },
+            icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+            title = { Text("Confirmar Saída") },
+            text = { Text("Tem certeza que deseja sair da sua conta?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        authViewModel.logout()
+                        mostrarDialogLogout = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Sair")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogLogout = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
-            GradientHeader(title = "Configurações", onVoltar = onVoltar)
+            // CORREÇÃO: A chamada ao GradientHeader agora passa um IconButton completo
+            GradientHeader(
+                title = "Configurações",
+                navigationIcon = {
+                    IconButton(onClick = onVoltar) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Voltar")
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         Column(
@@ -48,7 +86,6 @@ fun TelaConfiguracoes(
             verticalArrangement = Arrangement.spacedBy(Dimens.PaddingLarge)
         ) {
             Text("Leitor RFID", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
             SettingSliderItem(
                 title = "Potência da Antena",
                 value = rfIdPower.toFloat(),
@@ -57,33 +94,39 @@ fun TelaConfiguracoes(
                 steps = 28,
                 icon = Icons.Default.GraphicEq
             )
-
             Divider()
-
             Text("Feedback", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
             SettingSwitchItem(
                 title = "Som de leitura",
                 checked = soundEnabled,
                 onCheckedChange = { viewModel.updateSoundFeedback(it) },
                 icon = Icons.Default.NotificationsActive
             )
-
             SettingSwitchItem(
                 title = "Vibração ao ler",
                 checked = vibrationEnabled,
                 onCheckedChange = { viewModel.updateVibrationFeedback(it) },
                 icon = Icons.Default.Vibration
             )
-
             Divider()
-
             Text("Aparência", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
             SegmentedButtonTheme(
                 selectedOption = themeOption,
                 onOptionSelected = { viewModel.updateThemeOption(it) }
             )
+            Spacer(modifier = Modifier.weight(1f))
+            OutlinedButton(
+                onClick = { mostrarDialogLogout = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Dimens.PaddingMedium),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Default.ExitToApp, contentDescription = null)
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text("Sair da Conta")
+            }
         }
     }
 }

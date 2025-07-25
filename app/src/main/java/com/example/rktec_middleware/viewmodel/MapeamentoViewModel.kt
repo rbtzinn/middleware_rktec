@@ -1,102 +1,79 @@
 package com.example.rktec_middleware.viewmodel
 
-import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.ItemInventario
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha
 import com.example.rktec_middleware.data.model.Usuario
-import com.example.rktec_middleware.util.LeitorInventario
+import com.example.rktec_middleware.repository.InventarioRepository
+import com.example.rktec_middleware.repository.UsuarioRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import javax.inject.Inject
 
+// Novo estado, mais descritivo para a UI
 sealed class MapeamentoState {
     object Idle : MapeamentoState()
-    object Loading : MapeamentoState()
-    data class Success(val totalItens: Int) : MapeamentoState()
+    data class Loading(val message: String) : MapeamentoState()
+    data class Success(val message: String) : MapeamentoState()
     data class Error(val message: String) : MapeamentoState()
 }
 
 @HiltViewModel
 class MapeamentoViewModel @Inject constructor(
-    private val db: AppDatabase,
-    @ApplicationContext private val context: Context
+    private val inventarioRepository: InventarioRepository,
+    private val usuarioRepository: UsuarioRepository
 ) : ViewModel() {
 
     private val _mapeamentoState = MutableStateFlow<MapeamentoState>(MapeamentoState.Idle)
     val mapeamentoState: StateFlow<MapeamentoState> = _mapeamentoState
 
-    fun processarEsalvarDados(
-        usuario: Usuario, uri: Uri,
-        dadosBrutos: Pair<List<String>, List<List<String>>>?,
-        indexEpc: Int?, indexNome: Int?, indexSetor: Int?, indexLoja: Int?
+    // A ÚNICA FUNÇÃO PÚBLICA QUE A TELA VAI CHAMAR
+    fun confirmarMapeamentoEIniciarImportacao(
+        usuario: Usuario,
+        uri: Uri,
+        indexEpc: Int?,
+        indexNome: Int?,
+        indexSetor: Int?,
+        indexLoja: Int?
     ) {
-        if (indexEpc == null || dadosBrutos == null) {
+        if (indexEpc == null) {
             _mapeamentoState.value = MapeamentoState.Error("A coluna EPC é obrigatória.")
             return
         }
 
-        _mapeamentoState.value = MapeamentoState.Loading
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
-                val cabecalho = dadosBrutos.first
-                val linhas = dadosBrutos.second
-                val companyId = usuario.companyId
+                // Passo 1: Enviar o arquivo bruto para o Storage
+                _mapeamentoState.value = MapeamentoState.Loading("Enviando arquivo...")
+                inventarioRepository.uploadPlanilhaParaStorage(usuario.companyId, uri)
 
-                // CORREÇÃO: Construtor do MapeamentoPlanilha na ordem correta
+                // Passo 2: Salvar a configuração de mapeamento no Firestore
+                _mapeamentoState.value = MapeamentoState.Loading("Salvando configuração de mapeamento...")
                 val mapeamento = MapeamentoPlanilha(
                     usuario = usuario.nome,
                     nomeArquivo = uri.lastPathSegment ?: "desconhecido",
-                    colunaEpc = indexEpc, // Int não nulo
+                    colunaEpc = indexEpc,
                     colunaNome = indexNome,
                     colunaSetor = indexSetor,
                     colunaLoja = indexLoja
                 )
+                usuarioRepository.salvarConfiguracaoMapeamento(usuario.companyId, mapeamento)
 
-                val indicesMapeados = listOfNotNull(indexEpc, indexNome, indexSetor, indexLoja)
-
-                val listaItens = linhas.mapNotNull { linha ->
-                    val tag = linha.getOrNull(indexEpc)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                    val desc = indexNome?.let { linha.getOrNull(it) } ?: ""
-                    val setor = indexSetor?.let { linha.getOrNull(it) } ?: ""
-                    val loja = indexLoja?.let { linha.getOrNull(it) } ?: ""
-                    val colunasExtras = mutableMapOf<String, String>()
-                    cabecalho.forEachIndexed { index, nomeColuna ->
-                        if (index !in indicesMapeados) colunasExtras[nomeColuna] = linha.getOrNull(index) ?: ""
-                    }
-                    ItemInventario(tag, desc, setor, loja, colunasExtras, companyId = companyId)
-                }
-
-                if (listaItens.isEmpty()) {
-                    _mapeamentoState.value = MapeamentoState.Error("Nenhum item válido encontrado na planilha.")
-                    return@launch
-                }
-
-                db.inventarioDao().limparInventarioPorEmpresa(companyId)
-                db.inventarioDao().inserirTodos(listaItens)
-
-                val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
-                prefs.edit().putString("cabecalho_original", JSONArray(cabecalho).toString()).apply()
-
-                db.mapeamentoDao().deletarTudo()
-                db.mapeamentoDao().inserir(mapeamento)
-
-                _mapeamentoState.value = MapeamentoState.Success(listaItens.size)
+                // Passo 3: Sucesso!
+                _mapeamentoState.value = MapeamentoState.Success("Importação iniciada! O processamento continuará em segundo plano.")
 
             } catch (e: Exception) {
-                Log.e("MapeamentoViewModel", "Erro na importação", e)
-                _mapeamentoState.value = MapeamentoState.Error("Falha na importação: ${e.message}")
+                Log.e("MapeamentoViewModel", "Falha no processo de importação", e)
+                _mapeamentoState.value = MapeamentoState.Error("Erro: ${e.message}")
             }
         }
+    }
+
+    fun resetarEstado() {
+        _mapeamentoState.value = MapeamentoState.Idle
     }
 }

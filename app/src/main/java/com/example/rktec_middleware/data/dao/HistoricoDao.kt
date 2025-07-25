@@ -11,6 +11,9 @@ interface HistoricoDao {
     suspend fun inserirSessao(sessao: SessaoInventario): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun inserirSessoes(sessoes: List<SessaoInventario>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun inserirItensSessao(items: List<ItemSessao>)
 
     @Query("SELECT * FROM sessoes_inventario ORDER BY dataHora DESC")
@@ -21,4 +24,7 @@ interface HistoricoDao {
 
     @Query("SELECT * FROM itens_sessao WHERE sessaoId = :sessaoId")
     fun getItensDaSessao(sessaoId: Long): Flow<List<ItemSessao>>
+
+    @Query("SELECT * FROM sessoes_inventario WHERE companyId = :companyId ORDER BY dataHora DESC")
+    fun getSessoesPorEmpresa(companyId: String): Flow<List<SessaoInventario>>
 }

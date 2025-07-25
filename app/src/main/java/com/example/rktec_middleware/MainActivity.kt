@@ -6,28 +6,21 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.TipoUsuario
-import com.example.rktec_middleware.repository.UsuarioRepository
+import com.example.rktec_middleware.ui.components.AppDrawerContent
 import com.example.rktec_middleware.ui.screens.*
 import com.example.rktec_middleware.ui.theme.RKTecMiddlewareTheme
 import com.example.rktec_middleware.viewmodel.AuthState
@@ -37,15 +30,12 @@ import com.example.rktec_middleware.viewmodel.RfidViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var appDatabase: AppDatabase
-    @Inject
-    lateinit var usuarioRepository: UsuarioRepository
 
     private val rfidViewModel: RfidViewModel by viewModels()
     private var lendo = false
@@ -61,17 +51,15 @@ class MainActivity : ComponentActivity() {
             RKTecMiddlewareTheme(themeOption = themeOption) {
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
-
                 val authViewModel: AuthViewModel = hiltViewModel()
                 val authState by authViewModel.authState.collectAsState()
 
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+
                 LaunchedEffect(Unit) {
-                    authViewModel.verificarEstadoAutenticacao {
-                        appDatabase.mapeamentoDao().buscarPrimeiro() != null
-                    }
+                    authViewModel.verificarEstadoAutenticacao()
                 }
 
-                // CORREÇÃO ESTRUTURAL: O 'when' agora tem 3 blocos separados e corretos.
                 when (val state = authState) {
                     is AuthState.Carregando -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -85,9 +73,8 @@ class MainActivity : ComponentActivity() {
                                 FluxoAutenticacao(
                                     aoLoginSucesso = { usuario ->
                                         scope.launch {
-                                            val mapeamento =
-                                                appDatabase.mapeamentoDao().buscarPrimeiro() != null
-                                            authViewModel.onLoginSucesso(usuario, mapeamento)
+                                            val inventarioLocal = appDatabase.inventarioDao().listarTodosPorEmpresa(usuario.companyId)
+                                            authViewModel.onLoginSucesso(usuario, inventarioLocal.isNotEmpty())
                                         }
                                     }
                                 )
@@ -97,138 +84,116 @@ class MainActivity : ComponentActivity() {
 
                     is AuthState.Autenticado -> {
                         val usuarioAutenticado = state.usuario
-                        val startDestination = if (state.mapeamentoConcluido) Screen.Principal.route else Screen.Importacao.route
+                        val startDestination = if (state.empresaJaConfigurada) Screen.Principal.route else Screen.Importacao.route
 
-                        NavHost(navController = navController, startDestination = startDestination) {
-                            composable(Screen.Principal.route) {
-                                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                                    val screenWidthPx = with(LocalDensity.current) { constraints.maxWidth.toFloat() }
-                                    val offsetX = remember { Animatable(0f) }
+                        ModalNavigationDrawer(
+                            drawerState = drawerState,
+                            gesturesEnabled = drawerState.isOpen,
+                            drawerContent = {
+                                AppDrawerContent(
+                                    usuario = usuarioAutenticado,
+                                    onNavigateToProfile = {
+                                        navController.navigate(Screen.Perfil.route)
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    onNavigateToSettings = {
+                                        navController.navigate(Screen.Configuracoes.route)
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    onLogoutClick = {  // CORRIGIDO!
+                                        authViewModel.logout()
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    onCloseDrawer = { scope.launch { drawerState.close() } }
+                                )
+                            }
+                        ) {
+                            NavHost(navController = navController, startDestination = startDestination) {
+                                composable(Screen.Principal.route) {
+                                    TelaPrincipal(
+                                        authViewModel = authViewModel,  // PARÂMETRO ADICIONADO
+                                        onMenuClick = { scope.launch { drawerState.open() } },
+                                        onInventarioClick = { navController.navigate(Screen.Inventario.route) },
+                                        onChecagemClick = { navController.navigate(Screen.Checagem.route) },
+                                        onColetaAvulsaClick = { navController.navigate(Screen.ColetaAvulsa.route) },
+                                        onSobreClick = { navController.navigate(Screen.Sobre.route) },
+                                        onGerenciarUsuariosClick = { navController.navigate(Screen.GerenciamentoUsuarios.route) },
+                                        onHistoricoClick = { navController.navigate(Screen.Historico.route) }
+                                    )
+                                }
 
-                                    val closeDebugScreen: () -> Unit = {
-                                        scope.launch {
-                                            offsetX.animateTo(0f, tween(300))
-                                        }
-                                    }
+                                composable(Screen.Configuracoes.route) {
+                                    TelaConfiguracoes(
+                                        authViewModel = authViewModel,
+                                        onVoltar = { navController.popBackStack() }
+                                    )
+                                }
 
-                                    TelaDebug(
-                                        usuarioLogado = usuarioAutenticado.nome,
-                                        onVoltar = closeDebugScreen,
-                                        onBancoLimpo = {
-                                            authViewModel.setMapeamentoConcluido(false)
+                                composable(Screen.Perfil.route) {
+                                    TelaPerfil(
+                                        onVoltar = { navController.popBackStack() },
+                                        authViewModel = authViewModel // PASSANDO O VIEWMODEL
+                                    )
+                                }
+
+                                composable(Screen.GerenciamentoUsuarios.route) {
+                                    TelaGerenciamentoUsuarios(onVoltar = { navController.popBackStack() })
+                                }
+
+                                composable(Screen.Importacao.route) {
+                                    TelaImportacao(
+                                        onConcluido = {
+                                            authViewModel.setEmpresaConfigurada(true)
+                                            navController.navigate(Screen.Principal.route) {
+                                                popUpTo(Screen.Importacao.route) { inclusive = true }
+                                            }
+                                        },
+                                        usuario = usuarioAutenticado,
+                                        onSobreClick = { navController.navigate(Screen.Sobre.route) }
+                                    )
+                                }
+
+                                composable(Screen.Inventario.route) {
+                                    TelaInventario(
+                                        onVoltar = { navController.popBackStack() },
+                                        onIniciarLeituraInventario = { loja, setor ->
+                                            navController.navigate(Screen.LeituraInventario.createRoute(loja, setor))
+                                        },
+                                        onSobreClick = { navController.navigate(Screen.Sobre.route) }
+                                    )
+                                }
+
+                                composable(Screen.Checagem.route) {
+                                    TelaChecagem(onVoltar = { navController.popBackStack() })
+                                }
+
+                                composable(Screen.ColetaAvulsa.route) {
+                                    TelaLeituraColeta(viewModel = rfidViewModel, onVoltar = { navController.popBackStack() })
+                                }
+
+                                composable(Screen.Sobre.route) {
+                                    TelaSobre(onVoltar = { navController.popBackStack() })
+                                }
+
+                                composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) {
+                                    TelaLeituraInventario(
+                                        onVoltar = { navController.popBackStack() },
+                                        usuario = usuarioAutenticado
+                                    )
+                                }
+
+                                composable(Screen.Historico.route) {
+                                    TelaHistorico(
+                                        onVoltar = { navController.popBackStack() },
+                                        onSessaoClick = { sessaoId ->
+                                            navController.navigate(Screen.DetalheHistorico.createRoute(sessaoId))
                                         }
                                     )
-
-                                    val dragModifier = if (usuarioAutenticado.tipo == TipoUsuario.ADMIN) {
-                                        Modifier.pointerInput(Unit) {
-                                            detectHorizontalDragGestures(
-                                                onHorizontalDrag = { change, dragAmount ->
-                                                    change.consume()
-                                                    scope.launch {
-                                                        val newOffset = (offsetX.value + dragAmount).coerceIn(0f, screenWidthPx)
-                                                        offsetX.snapTo(newOffset)
-                                                    }
-                                                },
-                                                onDragEnd = {
-                                                    scope.launch {
-                                                        if (offsetX.value > screenWidthPx / 2) {
-                                                            offsetX.animateTo(screenWidthPx, tween(300))
-                                                        } else {
-                                                            offsetX.animateTo(0f, tween(300))
-                                                        }
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    } else {
-                                        Modifier
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-                                            .then(dragModifier)
-                                    ) {
-                                        TelaPrincipal(
-                                            authViewModel = authViewModel,
-                                            onInventarioClick = { navController.navigate(Screen.Inventario.route) },
-                                            onChecagemClick = { navController.navigate(Screen.Checagem.route) },
-                                            onColetaAvulsaClick = { navController.navigate(Screen.ColetaAvulsa.route) },
-                                            onSobreClick = { navController.navigate(Screen.Sobre.route) },
-                                            onGerenciarUsuariosClick = { navController.navigate(Screen.GerenciamentoUsuarios.route) },
-                                            onConfiguracoesClick = { navController.navigate(Screen.Configuracoes.route) },
-                                            onHistoricoClick = { navController.navigate(Screen.Historico.route) },
-                                            onSairClick = { authViewModel.logout() }
-                                        )
-                                    }
                                 }
-                            }
 
-                            composable(Screen.Configuracoes.route) {
-                                TelaConfiguracoes(
-                                    onVoltar = { navController.popBackStack() }
-                                )
-                            }
-
-                            composable(Screen.Checagem.route) {
-                                TelaChecagem(onVoltar = { navController.popBackStack() })
-                            }
-
-                            composable(Screen.ColetaAvulsa.route) {
-                                TelaLeituraColeta(viewModel = rfidViewModel, onVoltar = { navController.popBackStack() })
-                            }
-
-                            composable(Screen.Importacao.route) {
-                                TelaImportacao(
-                                    onConcluido = {
-                                        authViewModel.setMapeamentoConcluido(true)
-                                        navController.navigate(Screen.Principal.route) { popUpTo(Screen.Importacao.route) { inclusive = true } }
-                                    },
-                                    usuario = usuarioAutenticado,
-                                    onSobreClick = { navController.navigate(Screen.Sobre.route) }
-                                )
-                            }
-
-                            composable(Screen.Inventario.route) {
-                                TelaInventario(
-                                    onVoltar = { navController.popBackStack() },
-                                    onIniciarLeituraInventario = { loja, setor ->
-                                        navController.navigate(Screen.LeituraInventario.createRoute(loja, setor))
-                                    },
-                                    onSobreClick = { navController.navigate(Screen.Sobre.route) }
-                                )
-                            }
-
-                            composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) {
-                                TelaLeituraInventario(
-                                    onVoltar = { navController.popBackStack() },
-                                    usuario = usuarioAutenticado
-                                )
-                            }
-
-                            composable(Screen.Sobre.route) {
-                                TelaSobre(onVoltar = { navController.popBackStack() })
-                            }
-
-                            composable(Screen.Historico.route) {
-                                TelaHistorico(
-                                    onVoltar = { navController.popBackStack() },
-                                    onSessaoClick = { sessaoId ->
-                                        navController.navigate(Screen.DetalheHistorico.createRoute(sessaoId))
-                                    }
-                                )
-                            }
-
-                            composable(route = Screen.DetalheHistorico.route, arguments = Screen.DetalheHistorico.arguments) {
-                                TelaDetalheHistorico(
-                                    onVoltar = { navController.popBackStack() }
-                                )
-                            }
-
-                            composable(Screen.GerenciamentoUsuarios.route) {
-                                TelaGerenciamentoUsuarios(
-                                    onVoltar = { navController.popBackStack() }
-                                )
+                                composable(route = Screen.DetalheHistorico.route, arguments = Screen.DetalheHistorico.arguments) {
+                                    TelaDetalheHistorico(onVoltar = { navController.popBackStack() })
+                                }
                             }
                         }
                     }

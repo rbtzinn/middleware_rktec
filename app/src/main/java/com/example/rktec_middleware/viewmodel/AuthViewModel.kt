@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.example.rktec_middleware.viewmodel.AuthState.Autenticado
 import com.google.firebase.auth.FirebaseAuth
@@ -13,59 +14,70 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// Sealed class AuthState permanece a mesma...
 sealed class AuthState {
     object Carregando : AuthState()
-    data class Autenticado(val usuario: Usuario, val mapeamentoConcluido: Boolean) : AuthState()
     object NaoAutenticado : AuthState()
+    data class Autenticado(val usuario: Usuario, val empresaJaConfigurada: Boolean) : AuthState()
 }
 
-
-@HiltViewModel // Anotação principal
-class AuthViewModel @Inject constructor( // Injeção no construtor
-    private val usuarioRepository: UsuarioRepository
+@HiltViewModel
+class AuthViewModel @Inject constructor(
+    private val usuarioRepository: UsuarioRepository,
+    private val inventarioRepository: InventarioRepository
 ) : ViewModel() {
 
-    // O corpo da classe permanece exatamente o mesmo
     private val _authState = MutableStateFlow<AuthState>(AuthState.Carregando)
     val authState: StateFlow<AuthState> = _authState
 
-    fun verificarEstadoAutenticacao(isMapeamentoOk: suspend () -> Boolean) {
+    fun verificarEstadoAutenticacao() {
         viewModelScope.launch {
             _authState.value = AuthState.Carregando
             val firebaseUser = FirebaseAuth.getInstance().currentUser
 
             if (firebaseUser?.email != null) {
-                var usuarioLocal = usuarioRepository.buscarPorEmail(firebaseUser.email!!)
+                usuarioRepository.escutarMudancasUsuario(firebaseUser.email!!)
+                    .collect { usuarioDaNuvem ->
+                        if (usuarioDaNuvem != null) {
+                            // Usuário existe no Firestore
+                            usuarioRepository.cadastrarUsuario(usuarioDaNuvem)
 
-                if (usuarioLocal == null) {
-                    val usuarioFirestore = usuarioRepository.buscarUsuarioNoFirestore(firebaseUser.email!!)
-                    if (usuarioFirestore != null) {
-                        usuarioRepository.cadastrarUsuario(usuarioFirestore)
-                        usuarioLocal = usuarioFirestore
+                            if (usuarioDaNuvem.ativo) {
+                                // Usuário está ativo, verificar a empresa
+                                val empresa = usuarioRepository.buscarEmpresaPorId(usuarioDaNuvem.companyId)
+                                val empresaConfigurada = empresa?.planilhaImportada ?: false
+
+                                if (empresaConfigurada) {
+                                    inventarioRepository.syncInventarioDoFirestore(usuarioDaNuvem.companyId)
+                                }
+                                _authState.value = AuthState.Autenticado(usuarioDaNuvem, empresaConfigurada)
+
+                            } else {
+                                // Usuário foi desativado
+                                FirebaseAuth.getInstance().signOut()
+                                _authState.value = AuthState.NaoAutenticado
+                            }
+                        } else {
+                            // Usuário autenticado no Firebase Auth, mas sem registro no Firestore.
+                            // Isso pode acontecer se o registro for excluído manualmente.
+                            FirebaseAuth.getInstance().signOut()
+                            _authState.value = AuthState.NaoAutenticado
+                        }
                     }
-                }
-                if (usuarioLocal != null && usuarioLocal.ativo) {
-                    val mapeamentoConcluido = isMapeamentoOk()
-                    _authState.value = AuthState.Autenticado(usuarioLocal, mapeamentoConcluido)
-                } else {
-                    FirebaseAuth.getInstance().signOut()
-                    _authState.value = AuthState.NaoAutenticado
-                }
             } else {
+                // Nenhum usuário logado no Firebase Auth
                 _authState.value = AuthState.NaoAutenticado
             }
         }
     }
 
-    fun onLoginSucesso(usuario: Usuario, mapeamentoConcluido: Boolean) {
-        _authState.value = AuthState.Autenticado(usuario, mapeamentoConcluido)
+    fun onLoginSucesso(usuario: Usuario, inventarioSincronizado: Boolean) {
+        _authState.value = Autenticado(usuario, inventarioSincronizado)
     }
 
-    fun setMapeamentoConcluido(concluido: Boolean) {
-        if (_authState.value is AuthState.Autenticado) {
-            val estadoAtual = _authState.value as AuthState.Autenticado
-            _authState.value = estadoAtual.copy(mapeamentoConcluido = concluido)
+    fun setEmpresaConfigurada(configurada: Boolean) {
+        val estadoAtual = _authState.value
+        if (estadoAtual is AuthState.Autenticado) {
+            _authState.value = estadoAtual.copy(empresaJaConfigurada = configurada)
         }
     }
 
@@ -83,26 +95,9 @@ class AuthViewModel @Inject constructor( // Injeção no construtor
                 val usuario = estadoAtual.usuario
                 if (usuario.tipo != TipoUsuario.ADMIN) {
                     val usuarioAdmin = usuario.copy(tipo = TipoUsuario.ADMIN)
-                    // Atualiza no repositório (que sincroniza com Firestore)
                     usuarioRepository.atualizarUsuario(usuarioAdmin)
-                    // Atualiza o estado local IMEDIATAMENTE
-                    _authState.value = estadoAtual.copy(usuario = usuarioAdmin)
+                    }
                 }
             }
         }
     }
-
-    fun recarregarUsuario() {
-        if (_authState.value is AuthState.Autenticado) {
-            viewModelScope.launch {
-                val estadoAtual = _authState.value as AuthState.Autenticado
-                val usuarioAtualizado = usuarioRepository.buscarPorEmail(estadoAtual.usuario.email)
-                if (usuarioAtualizado != null) {
-                    _authState.value = estadoAtual.copy(usuario = usuarioAtualizado)
-                } else {
-                    logout()
-                }
-            }
-        }
-    }
-}

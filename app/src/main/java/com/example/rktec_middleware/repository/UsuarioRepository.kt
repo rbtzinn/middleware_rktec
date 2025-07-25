@@ -3,12 +3,14 @@ package com.example.rktec_middleware.repository
 import android.util.Log
 import com.example.rktec_middleware.data.dao.UsuarioDao
 import com.example.rktec_middleware.data.model.Empresa
+import com.example.rktec_middleware.data.model.MapeamentoPlanilha // IMPORT ADICIONADO
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.ktx.toObject
-import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,11 +20,11 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
 
     private val firebaseDb = FirebaseFirestore.getInstance()
     private val usuariosCollection = firebaseDb.collection("usuarios")
+    private val empresasCollection = firebaseDb.collection("empresas")
 
     suspend fun buscarPorEmail(email: String) = usuarioDao.buscarPorEmail(email)
     suspend fun listarTodosPorEmpresa(companyId: String) = usuarioDao.listarTodosPorEmpresa(companyId)
     suspend fun listarEmails(): List<String> = usuarioDao.listarEmails()
-    private val empresasCollection = firebaseDb.collection("empresas")
 
     suspend fun buscarUsuarioNoFirestore(email: String): Usuario? {
         return try {
@@ -37,10 +39,24 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
     suspend fun buscarEmpresaPorId(companyId: String): Empresa? {
         return try {
             val document = empresasCollection.document(companyId).get().await()
-            document.toObject<Empresa>()?.copy(id = document.id) // Copia o ID para dentro do objeto
+            document.toObject<Empresa>()?.copy(id = document.id)
         } catch (e: Exception) {
             Log.e("UsuarioRepository", "Erro ao buscar empresa por ID", e)
             null
+        }
+    }
+
+    // NOVA FUNÇÃO PARA SALVAR A CONFIGURAÇÃO DE MAPEAMENTO
+    suspend fun salvarConfiguracaoMapeamento(companyId: String, mapeamento: MapeamentoPlanilha) {
+        try {
+            empresasCollection.document(companyId)
+                .collection("config")
+                .document("mapeamento")
+                .set(mapeamento)
+                .await()
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao salvar mapeamento", e)
+            throw e
         }
     }
 
@@ -83,10 +99,9 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
         usuariosCollection.document(usuario.email).set(usuarioMap).await()
     }
 
-    // NOVA FUNÇÃO QUE ESTAVA FALTANDO
     suspend fun reativarETransferirUsuario(usuario: Usuario, novoCodigoConvite: String): Result<Usuario> {
         return try {
-            val snapshot = Firebase.firestore.collection("empresas")
+            val snapshot = firebaseDb.collection("empresas")
                 .whereEqualTo("codigoConvite", novoCodigoConvite.uppercase())
                 .get().await()
 
@@ -95,19 +110,40 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
             }
 
             val novoCompanyId = snapshot.documents.first().id
-
             val usuarioAtualizado = usuario.copy(
                 ativo = true,
                 companyId = novoCompanyId,
                 tipo = TipoUsuario.MEMBRO
             )
-
             atualizarUsuario(usuarioAtualizado)
-
             Result.success(usuarioAtualizado)
 
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    suspend fun marcarEmpresaComoConfigurada(companyId: String) {
+        try {
+            empresasCollection.document(companyId).update("planilhaImportada", true).await()
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao atualizar status da empresa", e)
+        }
+    }
+
+    fun escutarMudancasUsuario(email: String): Flow<Usuario?> = callbackFlow {
+        val listener = usuariosCollection.document(email)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null && snapshot.exists()) {
+                    trySend(snapshot.toObject<Usuario>()).isSuccess
+                } else {
+                    trySend(null).isSuccess
+                }
+            }
+        awaitClose { listener.remove() }
     }
 }

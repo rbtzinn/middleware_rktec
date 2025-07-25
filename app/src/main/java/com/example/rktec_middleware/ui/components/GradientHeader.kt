@@ -19,7 +19,8 @@ import com.example.rktec_middleware.ui.theme.LocalThemeIsDark
 fun GradientHeader(
     title: String,
     subtitle: String? = null,
-    onVoltar: () -> Unit,
+    onVoltar: (() -> Unit)? = null,
+    navigationIcon: @Composable (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     val isDarkTheme = LocalThemeIsDark.current
@@ -51,12 +52,16 @@ fun GradientHeader(
         },
         modifier = Modifier.background(headerBrush),
         navigationIcon = {
-            IconButton(onClick = onVoltar) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Voltar",
-                    modifier = Modifier.size(Dimens.IconSizeLarge)
-                )
+            if (navigationIcon != null) {
+                navigationIcon()
+            } else if (onVoltar != null) {
+                IconButton(onClick = onVoltar) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Voltar",
+                        modifier = Modifier.size(Dimens.IconSizeLarge)
+                    )
+                }
             }
         },
         actions = actions,

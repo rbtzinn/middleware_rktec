@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,7 +19,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.ui.components.PrimaryButton
 import com.example.rktec_middleware.ui.components.SecondaryTextButton
-import com.example.rktec_middleware.ui.theme.*
+import com.example.rktec_middleware.ui.theme.Dimens
+import com.example.rktec_middleware.ui.theme.RktBlueLight
+import com.example.rktec_middleware.ui.theme.RktStroke
+import com.example.rktec_middleware.ui.theme.RktTextPrimary
 import com.example.rktec_middleware.util.LeitorInventario
 import com.example.rktec_middleware.viewmodel.MapeamentoState
 import com.example.rktec_middleware.viewmodel.MapeamentoViewModel
@@ -31,7 +34,7 @@ import kotlinx.coroutines.withContext
 fun TelaMapeamentoPlanilha(
     uri: Uri,
     usuario: Usuario,
-    onSalvar: (totalItens: Int) -> Unit,
+    onSalvar: () -> Unit, // Assinatura simplificada
     onCancelar: () -> Unit,
     viewModel: MapeamentoViewModel = hiltViewModel()
 ) {
@@ -45,8 +48,11 @@ fun TelaMapeamentoPlanilha(
 
     val mapeamentoState by viewModel.mapeamentoState.collectAsState()
 
+    // LÊ O CABEÇALHO DO ARQUIVO
     LaunchedEffect(uri) {
+        viewModel.resetarEstado() // Reseta o estado ao entrar na tela
         withContext(Dispatchers.IO) {
+            // Apenas lê os dados, não processa
             dadosBrutos = LeitorInventario.lerDadosBrutosDaPlanilha(context, uri)
         }
         isReadingFile = false
@@ -56,11 +62,12 @@ fun TelaMapeamentoPlanilha(
         }
     }
 
+    // REAGE ÀS MUDANÇAS DE ESTADO DO VIEWMODEL
     LaunchedEffect(mapeamentoState) {
         when(val state = mapeamentoState) {
             is MapeamentoState.Success -> {
-                Toast.makeText(context, "${state.totalItens} itens importados com sucesso!", Toast.LENGTH_SHORT).show()
-                onSalvar(state.totalItens)
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                onSalvar() // Chama o onSalvar para navegar para a próxima tela
             }
             is MapeamentoState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
@@ -118,23 +125,34 @@ fun TelaMapeamentoPlanilha(
 
                 Spacer(Modifier.weight(1f))
 
+                if (mapeamentoState is MapeamentoState.Loading) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(Dimens.PaddingMedium),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.width(Dimens.PaddingMedium))
+                        Text((mapeamentoState as MapeamentoState.Loading).message)
+                    }
+                }
+
                 Column(Modifier.padding(Dimens.PaddingMedium), horizontalAlignment = Alignment.CenterHorizontally) {
                     PrimaryButton(
                         onClick = {
-                            viewModel.processarEsalvarDados(
+                            viewModel.confirmarMapeamentoEIniciarImportacao(
                                 usuario = usuario,
                                 uri = uri,
-                                dadosBrutos = dadosBrutos,
                                 indexEpc = indexEpc,
                                 indexNome = indexNome,
                                 indexSetor = indexSetor,
                                 indexLoja = indexLoja
                             )
                         },
-                        text = if (isLoading) "Processando..." else "Confirmar e Importar",
+                        text = if (isLoading) "Processando..." else "Confirmar e Iniciar",
                         enabled = indexEpc != null && !isLoading
                     )
-                    SecondaryTextButton(onClick = onCancelar, text = "Cancelar")
+                    SecondaryTextButton(onClick = onCancelar, text = "Cancelar", enabled = !isLoading)
                 }
             }
         }
@@ -169,7 +187,7 @@ private fun CampoMapeamento(
         Spacer(modifier = Modifier.height(Dimens.PaddingSmall))
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
             OutlinedTextField(
-                value = selecionado?.let { colunas.getOrNull(it) } ?: "Nenhuma seleção", // <-- TEXTO CORRIGIDO
+                value = selecionado?.let { colunas.getOrNull(it) } ?: "Nenhuma seleção",
                 onValueChange = {},
                 readOnly = true,
                 modifier = Modifier.menuAnchor().fillMaxWidth(),
@@ -199,7 +217,6 @@ private fun CampoMapeamento(
                             Text(
                                 col,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                // ESTILO CORRIGIDO: Só fica em negrito se for a seleção atual
                                 fontWeight = if (selecionado == idx) FontWeight.Bold else FontWeight.Normal
                             )
                         },

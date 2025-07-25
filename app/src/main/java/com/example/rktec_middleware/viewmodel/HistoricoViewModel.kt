@@ -4,28 +4,41 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.SessaoInventario
 import com.example.rktec_middleware.repository.HistoricoRepository
+import com.example.rktec_middleware.repository.UsuarioRepository
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class HistoricoViewModel @Inject constructor(
-    private val historicoRepository: HistoricoRepository
+    private val historicoRepository: HistoricoRepository,
+    private val usuarioRepository: UsuarioRepository,
+    private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
-    val sessoes: StateFlow<List<SessaoInventario>> = historicoRepository.getTodasSessoes()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    private val _sessoes = MutableStateFlow<List<SessaoInventario>>(emptyList())
+    val sessoes = _sessoes.asStateFlow()
 
     init {
+        carregarHistoricoPorEmpresa()
+    }
+
+    private fun carregarHistoricoPorEmpresa() {
         viewModelScope.launch {
-            historicoRepository.sincronizarSessoesDaNuvem()
+            val email = firebaseAuth.currentUser?.email ?: return@launch
+
+            val usuario = usuarioRepository.buscarPorEmail(email)
+            val companyId = usuario?.companyId ?: return@launch
+
+            historicoRepository.sincronizarSessoesDaNuvem(companyId)
+
+            historicoRepository.getSessoesPorEmpresa(companyId).collectLatest { sessoesDaEmpresa ->
+                _sessoes.value = sessoesDaEmpresa
+            }
         }
     }
 }

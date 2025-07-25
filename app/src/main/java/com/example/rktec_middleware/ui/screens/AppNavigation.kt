@@ -4,8 +4,6 @@ import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
-// Sealed class para definir todas as rotas de navegação do aplicativo.
-// Esta é a versão unificada e correta para o projeto.
 sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = emptyList()) {
     object Autenticacao : Screen("autenticacao")
     object Principal : Screen("principal")
@@ -17,6 +15,7 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
     object Sobre : Screen("sobre")
     object GerenciamentoUsuarios : Screen("gerenciamento_usuarios")
     object Historico : Screen("historico")
+    object Perfil : Screen("perfil")
     object DetalheHistorico : Screen(
         route = "detalhe_historico/{sessaoId}",
         arguments = listOf(navArgument("sessaoId") { type = NavType.LongType })

@@ -2,9 +2,12 @@ package com.example.rktec_middleware.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,8 +23,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ExportProgress
@@ -38,30 +44,28 @@ import com.example.rktec_middleware.viewmodel.TelaPrincipalViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.roundToInt
 
 @Composable
 fun TelaPrincipal(
     authViewModel: AuthViewModel,
+    onMenuClick: () -> Unit,
     onColetaAvulsaClick: () -> Unit,
     onInventarioClick: () -> Unit,
     onChecagemClick: () -> Unit,
     onSobreClick: () -> Unit,
-    onSairClick: () -> Unit,
     onGerenciarUsuariosClick: () -> Unit,
-    onConfiguracoesClick: () -> Unit,
     onHistoricoClick: () -> Unit,
     telaPrincipalViewModel: TelaPrincipalViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.authState.collectAsState()
     val usuario = (authState as? AuthState.Autenticado)?.usuario
-
     val exportState by telaPrincipalViewModel.exportState.collectAsState()
-    // NOVO: Coletar os dados do dashboard
     val dashboardData by telaPrincipalViewModel.dashboardData.collectAsState()
 
-    var mostrarDialogSair by remember { mutableStateOf(false) }
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
     var mostrarDialogExportar by remember { mutableStateOf(false) }
+    var mostrarDialogLogout by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -76,8 +80,33 @@ fun TelaPrincipal(
                 Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
                 telaPrincipalViewModel.resetExportState()
             }
-            else -> { /* Não faz nada para Idle ou InProgress */ }
+            else -> { /* Não faz nada */ }
         }
+    }
+
+    if (mostrarDialogLogout) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogLogout = false },
+            icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+            title = { Text("Confirmar Saída") },
+            text = { Text("Tem certeza que deseja sair da sua conta?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        authViewModel.logout()
+                        mostrarDialogLogout = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Sair")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogLogout = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     if (usuario == null) {
@@ -85,162 +114,198 @@ fun TelaPrincipal(
             CircularProgressIndicator()
         }
     } else {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
+        // LÓGICA DE ARRASTAR PARA O DEBUG RESTAURADA
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val screenWidthPx = with(LocalDensity.current) { constraints.maxWidth.toFloat() }
+            val offsetX = remember { Animatable(0f) }
+
+            val closeDebugScreen: () -> Unit = {
+                scope.launch {
+                    offsetX.animateTo(0f, tween(300))
+                }
+            }
+
+            // A TelaDebug continua existindo "por trás"
+            TelaDebug(
+                usuarioLogado = usuario.nome,
+                onVoltar = closeDebugScreen,
+                onBancoLimpo = {
+                    authViewModel.setEmpresaConfigurada(false)
+                }
+            )
+
+            val dragModifier = if (usuario.tipo == TipoUsuario.ADMIN) {
+                Modifier.pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            scope.launch {
+                                val newOffset = (offsetX.value + dragAmount).coerceIn(0f, screenWidthPx)
+                                offsetX.snapTo(newOffset)
+                            }
+                        },
+                        onDragEnd = {
+                            scope.launch {
+                                if (offsetX.value > screenWidthPx / 2) {
+                                    offsetX.animateTo(screenWidthPx, tween(300))
+                                } else {
+                                    offsetX.animateTo(0f, tween(300))
+                                }
+                            }
+                        }
+                    )
+                }
+            } else {
+                Modifier
+            }
+
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    .verticalScroll(rememberScrollState())
+                    .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                    .then(dragModifier)
             ) {
-                // O Header permanece o mesmo
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(140.dp).background(
-                        Brush.verticalGradient(0f to MaterialTheme.colorScheme.primaryContainer, 1f to MaterialTheme.colorScheme.primary)
-                    )
-                ) {
-                    Row(
-                        Modifier.fillMaxSize().padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AvatarComGestoSecreto(
-                            nomeUsuario = usuario.nome,
-                            onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
-                        )
-                        Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
-                        Column {
-                            Text(
-                                dashboardData.nomeEmpresa,
-                                style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
-                            )
-                            Text(
-                                "Bem-vindo, ${usuario.nome.split(" ").first()}",
-                                style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
-                                maxLines = 1,
-                            )
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(
-                            onClick = { onConfiguracoesClick() },
-                            modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
-                        ) {
-                            Icon(Icons.Default.Settings, contentDescription = "Configurações", tint = Color.White)
-                        }
-                        Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
-                        IconButton(
-                            onClick = { mostrarDialogSair = true },
-                            modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
-                        ) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = "Sair", tint = Color.White, modifier = Modifier.size(Dimens.IconSizeMedium))
-                        }
-                    }
-                }
-
-                // MUDANÇA: Seção do Dashboard adicionada
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .offset(y = (-30).dp)
-                        .padding(horizontal = Dimens.PaddingLarge),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
-                ) {
-                    DashboardSection(dashboardData)
-
-                    // Os FeatureCards continuam aqui
-                    FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
-                    FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
-                    FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
-                    FeatureCard(
-                        title = "Histórico de Inventários",
-                        subtitle = "Consulte relatórios de contagens passadas",
-                        icon = Icons.Default.History,
-                        color = MaterialTheme.colorScheme.secondary,
-                        onClick = onHistoricoClick,
-                        description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais."
-                    )
-                    FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Dimens.PaddingMedium),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
-                    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = onSobreClick) {
-                            Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", tint = RktGreen, modifier = Modifier.size(Dimens.IconSizeSmall))
-                            Spacer(Modifier.width(Dimens.PaddingSmall))
-                            Text("Sobre o Sistema", color = RktGreen, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to MaterialTheme.colorScheme.primaryContainer,
+                                    1f to MaterialTheme.colorScheme.primary
+                                )
+                            )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AvatarComGestoSecreto(
+                                nomeUsuario = usuario.nome,
+                                onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
+                            )
+                            Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
+                            Column {
+                                Text(
+                                    dashboardData.nomeEmpresa,
+                                    style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
+                                )
+                                Text(
+                                    "Bem-vindo, ${usuario.nome.split(" ").first()}",
+                                    style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
+                                    maxLines = 1,
+                                )
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            IconButton(
+                                onClick = { onMenuClick() },
+                                modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                            }
                         }
                     }
-                    Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
-                    Text("Todos os direitos reservados", style = MaterialTheme.typography.labelMedium)
-                }
-            }
 
-            if (usuario.tipo == TipoUsuario.ADMIN) {
-                FloatingActionButton(
-                    onClick = onGerenciarUsuariosClick,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(Dimens.PaddingLarge),
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.Default.ManageAccounts, "Gerenciar Usuários")
-                }
-            }
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .offset(y = (-30).dp)
+                            .padding(horizontal = Dimens.PaddingLarge),
+                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
+                    ) {
+                        DashboardSection(dashboardData)
+                        FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
+                        FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
+                        FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
+                        FeatureCard(
+                            title = "Histórico de Inventários",
+                            subtitle = "Consulte relatórios de contagens passadas",
+                            icon = Icons.Default.History,
+                            color = MaterialTheme.colorScheme.secondary,
+                            onClick = onHistoricoClick,
+                            description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais."
+                        )
+                        FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
+                    }
 
-            if (mostrarDialogExportar) {
-                AlertDialog(
-                    onDismissRequest = { mostrarDialogExportar = false },
-                    icon = { Icon(Icons.Default.UploadFile, contentDescription = null) },
-                    title = { Text("Confirmar Exportação") },
-                    text = { Text("Deseja realmente gerar a planilha final com todos os dados do inventário?") },
-                    confirmButton = {
-                        Button(onClick = {
-                            telaPrincipalViewModel.exportarPlanilhaCompleta()
-                            mostrarDialogExportar = false
-                        }) { Text("Exportar") }
-                    },
-                    dismissButton = { TextButton(onClick = { mostrarDialogExportar = false }) { Text("Cancelar") } }
-                )
-            }
+                    Spacer(modifier = Modifier.weight(1f))
 
-            if (mostrarDialogSair) {
-                AlertDialog(
-                    onDismissRequest = { mostrarDialogSair = false },
-                    title = { Text("Confirmar Saída") },
-                    text = { Text("Deseja realmente sair do aplicativo?") },
-                    confirmButton = { Button(onClick = onSairClick) { Text("Sair") } },
-                    dismissButton = { TextButton(onClick = { mostrarDialogSair = false }) { Text("Cancelar") } }
-                )
-            }
-
-            if (mostrarDialogAdmin) {
-                DialogPromoverAdmin(
-                    onConfirmar = { codigoDigitado ->
-                        if (codigoDigitado == "@DM2025") {
-                            authViewModel.promoverUsuarioAtualParaAdmin()
-
-                            scope.launch {
-                                LogHelper.registrarGerenciamentoUsuario(context, "SISTEMA", "PROMOÇÃO ADM", usuario.email, "Promoção via código secreto", "Usuário promovido a ADMIN pelo código secreto.")
-                                Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
-                                mostrarDialogAdmin = false
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Dimens.PaddingMedium),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
+                        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                            TextButton(onClick = onSobreClick) {
+                                Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", tint = RktGreen, modifier = Modifier.size(Dimens.IconSizeSmall))
+                                Spacer(Modifier.width(Dimens.PaddingSmall))
+                                Text("Sobre o Sistema", color = RktGreen, fontWeight = FontWeight.SemiBold)
                             }
-                            return@DialogPromoverAdmin true
-                        } else {
-                            return@DialogPromoverAdmin false
                         }
-                    },
-                    onCancelar = { mostrarDialogAdmin = false }
-                )
-            }
+                        Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
+                        Text("Todos os direitos reservados", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
 
-            if (exportState is ExportProgress.InProgress) {
-                val progresso = (exportState as ExportProgress.InProgress).percent
-                ProgressOverlay(progress = progresso / 100f, text = "Exportando planilha... $progresso%")
+                if (usuario.tipo == TipoUsuario.ADMIN) {
+                    FloatingActionButton(
+                        onClick = onGerenciarUsuariosClick,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(Dimens.PaddingLarge),
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Icon(Icons.Default.ManageAccounts, "Gerenciar Usuários")
+                    }
+                }
+
+                if (mostrarDialogExportar) {
+                    AlertDialog(
+                        onDismissRequest = { mostrarDialogExportar = false },
+                        icon = { Icon(Icons.Default.UploadFile, contentDescription = null) },
+                        title = { Text("Confirmar Exportação") },
+                        text = { Text("Deseja realmente gerar a planilha final com todos os dados do inventário?") },
+                        confirmButton = {
+                            Button(onClick = {
+                                telaPrincipalViewModel.exportarPlanilhaCompleta()
+                                mostrarDialogExportar = false
+                            }) { Text("Exportar") }
+                        },
+                        dismissButton = { TextButton(onClick = { mostrarDialogExportar = false }) { Text("Cancelar") } }
+                    )
+                }
+
+                if (mostrarDialogAdmin) {
+                    DialogPromoverAdmin(
+                        onConfirmar = { codigoDigitado ->
+                            if (codigoDigitado == "@DM2025") {
+                                authViewModel.promoverUsuarioAtualParaAdmin()
+                                scope.launch {
+                                    LogHelper.registrarGerenciamentoUsuario(context, "SISTEMA", "PROMOÇÃO ADM", usuario.email, "Promoção via código secreto", "Usuário promovido a ADMIN pelo código secreto.")
+                                    Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
+                                    mostrarDialogAdmin = false
+                                }
+                                return@DialogPromoverAdmin true
+                            } else {
+                                return@DialogPromoverAdmin false
+                            }
+                        },
+                        onCancelar = { mostrarDialogAdmin = false }
+                    )
+                }
+
+                if (exportState is ExportProgress.InProgress) {
+                    val progresso = (exportState as ExportProgress.InProgress).percent
+                    ProgressOverlay(progress = progresso / 100f, text = "Exportando planilha... $progresso%")
+                }
             }
         }
     }

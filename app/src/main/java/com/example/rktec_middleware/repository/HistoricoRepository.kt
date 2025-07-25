@@ -6,6 +6,7 @@ import com.example.rktec_middleware.data.model.ItemSessao
 import com.example.rktec_middleware.data.model.SessaoInventario
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,23 +14,23 @@ import javax.inject.Singleton
 @Singleton
 class HistoricoRepository @Inject constructor(private val historicoDao: HistoricoDao) {
 
-    // Inicializa a conexão com o Firestore.
-    // "sessoes" será o nome da nossa coleção na nuvem.
     private val sessoesCollection = Firebase.firestore.collection("sessoes")
 
-    // Funções que leem do banco local (Room)
-    fun getTodasSessoes() = historicoDao.getTodasSessoes()
-    suspend fun getSessaoPorId(id: Long) = historicoDao.getSessaoPorId(id)
-    fun getItensDaSessao(id: Long) = historicoDao.getItensDaSessao(id)
+    fun getTodasSessoes(): Flow<List<SessaoInventario>> = historicoDao.getTodasSessoes()
 
-    // MUDANÇA: Agora salva nos dois lugares!
+    suspend fun getSessaoPorId(id: Long): SessaoInventario? = historicoDao.getSessaoPorId(id)
+
+    fun getItensDaSessao(id: Long): Flow<List<ItemSessao>> = historicoDao.getItensDaSessao(id)
+
+    fun getSessoesPorEmpresa(companyId: String): Flow<List<SessaoInventario>> {
+        return historicoDao.getSessoesPorEmpresa(companyId)
+    }
+
     suspend fun salvarSessaoCompleta(sessao: SessaoInventario, itens: List<ItemSessao>) {
-        // 1. Salva no banco de dados local (Room)
         val sessaoIdLocal = historicoDao.inserirSessao(sessao)
         val itensComId = itens.map { it.copy(sessaoId = sessaoIdLocal) }
         historicoDao.inserirItensSessao(itensComId)
 
-        // 2. Envia uma cópia para o Firestore
         try {
             sessoesCollection.add(sessao).await()
             Log.d("HistoricoRepository", "Sessão salva com sucesso no Firestore!")
@@ -38,14 +39,18 @@ class HistoricoRepository @Inject constructor(private val historicoDao: Historic
         }
     }
 
-    suspend fun sincronizarSessoesDaNuvem() {
+    suspend fun sincronizarSessoesDaNuvem(companyId: String) {
         try {
-            val snapshot = sessoesCollection.get().await()
-            val sessoesDaNuvem = snapshot.toObjects(SessaoInventario::class.java)
-            Log.d("HistoricoRepository", "${sessoesDaNuvem.size} sessões encontradas na nuvem.")
-            // Lógica de mesclagem pode ser adicionada aqui no futuro
+            val snapshot = sessoesCollection
+                .whereEqualTo("companyId", companyId)
+                .get().await()
+
+            val sessoesNuvem = snapshot.toObjects(SessaoInventario::class.java)
+            if (sessoesNuvem.isNotEmpty()) {
+                historicoDao.inserirSessoes(sessoesNuvem)
+            }
         } catch (e: Exception) {
-            Log.e("HistoricoRepository", "Erro ao sincronizar sessões da nuvem", e)
+            Log.e("HistoricoRepository", "Erro ao sincronizar sessões da empresa: $companyId", e)
         }
     }
 }
