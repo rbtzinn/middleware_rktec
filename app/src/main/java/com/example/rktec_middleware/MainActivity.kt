@@ -67,15 +67,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // ...
                     is AuthState.NaoAutenticado -> {
                         NavHost(navController = navController, startDestination = Screen.Autenticacao.route) {
                             composable(Screen.Autenticacao.route) {
                                 FluxoAutenticacao(
-                                    aoLoginSucesso = { usuario ->
-                                        scope.launch {
-                                            val inventarioLocal = appDatabase.inventarioDao().listarTodosPorEmpresa(usuario.companyId)
-                                            authViewModel.onLoginSucesso(usuario, inventarioLocal.isNotEmpty())
-                                        }
+                                    aoLoginSucesso = {
+                                        authViewModel.onLoginSucesso()
                                     }
                                 )
                             }
@@ -111,7 +109,7 @@ class MainActivity : ComponentActivity() {
                             NavHost(navController = navController, startDestination = startDestination) {
                                 composable(Screen.Principal.route) {
                                     TelaPrincipal(
-                                        authViewModel = authViewModel,  // PARÂMETRO ADICIONADO
+                                        authViewModel = authViewModel,
                                         onMenuClick = { scope.launch { drawerState.open() } },
                                         onInventarioClick = { navController.navigate(Screen.Inventario.route) },
                                         onChecagemClick = { navController.navigate(Screen.Checagem.route) },
@@ -122,37 +120,50 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                composable(Screen.Configuracoes.route) {
-                                    TelaConfiguracoes(
-                                        authViewModel = authViewModel,
-                                        onVoltar = { navController.popBackStack() }
-                                    )
-                                }
-
-                                composable(Screen.Perfil.route) {
-                                    TelaPerfil(
-                                        onVoltar = { navController.popBackStack() },
-                                        authViewModel = authViewModel // PASSANDO O VIEWMODEL
-                                    )
-                                }
-
-                                composable(Screen.GerenciamentoUsuarios.route) {
-                                    TelaGerenciamentoUsuarios(onVoltar = { navController.popBackStack() })
-                                }
-
                                 composable(Screen.Importacao.route) {
                                     TelaImportacao(
+                                        // ##### MUDANÇA IMPORTANTE AQUI #####
                                         onConcluido = {
-                                            authViewModel.setEmpresaConfigurada(true)
-                                            navController.navigate(Screen.Principal.route) {
-                                                popUpTo(Screen.Importacao.route) { inclusive = true }
-                                            }
+                                            // Ao invés de ir para a tela Principal, agora navegamos para a tela de espera.
+                                            // Não setamos mais o "empresaJaConfigurada", pois o robô fará isso.
+                                            navController.navigate(Screen.AguardandoProcessamento.createRoute(usuarioAutenticado.companyId))
                                         },
                                         usuario = usuarioAutenticado,
                                         onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                     )
                                 }
 
+                                // ##### NOVA TELA ADICIONADA AO GRAFO #####
+                                composable(route = Screen.AguardandoProcessamento.route, arguments = Screen.AguardandoProcessamento.arguments) { backStackEntry ->
+                                    val companyId = backStackEntry.arguments?.getString("companyId") ?: ""
+                                    TelaAguardandoProcessamento(
+                                        companyId = companyId,
+                                        onProcessamentoConcluido = {
+                                            // Quando o processamento termina, vamos para a tela principal
+                                            // e limpamos todo o histórico de navegação de importação/espera.
+                                            navController.navigate(Screen.Principal.route) {
+                                                popUpTo(Screen.Importacao.route) { inclusive = true }
+                                            }
+                                        }
+                                    )
+                                }
+
+                                // --- O restante das suas rotas continua igual ---
+                                composable(Screen.Configuracoes.route) {
+                                    TelaConfiguracoes(
+                                        authViewModel = authViewModel,
+                                        onVoltar = { navController.popBackStack() }
+                                    )
+                                }
+                                composable(Screen.Perfil.route) {
+                                    TelaPerfil(
+                                        onVoltar = { navController.popBackStack() },
+                                        authViewModel = authViewModel
+                                    )
+                                }
+                                composable(Screen.GerenciamentoUsuarios.route) {
+                                    TelaGerenciamentoUsuarios(onVoltar = { navController.popBackStack() })
+                                }
                                 composable(Screen.Inventario.route) {
                                     TelaInventario(
                                         onVoltar = { navController.popBackStack() },
@@ -162,26 +173,21 @@ class MainActivity : ComponentActivity() {
                                         onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                     )
                                 }
-
                                 composable(Screen.Checagem.route) {
                                     TelaChecagem(onVoltar = { navController.popBackStack() })
                                 }
-
                                 composable(Screen.ColetaAvulsa.route) {
                                     TelaLeituraColeta(viewModel = rfidViewModel, onVoltar = { navController.popBackStack() })
                                 }
-
                                 composable(Screen.Sobre.route) {
                                     TelaSobre(onVoltar = { navController.popBackStack() })
                                 }
-
                                 composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) {
                                     TelaLeituraInventario(
                                         onVoltar = { navController.popBackStack() },
                                         usuario = usuarioAutenticado
                                     )
                                 }
-
                                 composable(Screen.Historico.route) {
                                     TelaHistorico(
                                         onVoltar = { navController.popBackStack() },
@@ -190,7 +196,6 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
-
                                 composable(route = Screen.DetalheHistorico.route, arguments = Screen.DetalheHistorico.arguments) {
                                     TelaDetalheHistorico(onVoltar = { navController.popBackStack() })
                                 }

@@ -31,12 +31,19 @@ class CadastroViewModel @Inject constructor(
     val cadastroState: StateFlow<CadastroState> = _cadastroState.asStateFlow()
 
     // MUDANÇA PRINCIPAL: A função agora recebe e valida o código de convite.
+    // Em CadastroViewModel.kt
+
+    // Em CadastroViewModel.kt
+
     fun cadastrar(nome: String, email: String, senha: String, codigoConvite: String) {
         _cadastroState.value = CadastroState.Loading
 
+        // AQUI ESTÁ A CORREÇÃO: .trim() remove espaços e .uppercase() converte para maiúsculas
+        val codigoFormatado = codigoConvite.trim().uppercase()
+
         // Passo 1: Valida o código da empresa no Firestore
         Firebase.firestore.collection("empresas")
-            .whereEqualTo("codigoConvite", codigoConvite.uppercase())
+            .whereEqualTo("codigoConvite", codigoFormatado) // Usando o código formatado
             .get()
             .addOnSuccessListener { querySnapshot ->
                 if (querySnapshot.isEmpty) {

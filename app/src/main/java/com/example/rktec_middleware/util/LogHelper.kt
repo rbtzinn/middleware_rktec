@@ -3,10 +3,7 @@ package com.example.rktec_middleware.util
 import android.content.Context
 import android.os.Environment
 import com.example.rktec_middleware.data.db.AppDatabase
-import com.example.rktec_middleware.data.model.EpcTag
-import com.example.rktec_middleware.data.model.ExportProgress
-import com.example.rktec_middleware.data.model.ItemInventario
-import com.example.rktec_middleware.data.model.LogGerenciamentoUsuario
+import com.example.rktec_middleware.data.model.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -19,9 +16,13 @@ import java.util.*
 
 object LogHelper {
 
-    // --- FUNÇÃO 1: EXPORTAR A PLANILHA (AGORA COM FLOW DE PROGRESSO) ---
-    // MUDANÇA: A função agora retorna um Flow<ExportProgress> e não é mais 'suspend'.
-    fun exportarPlanilhaCompleta(context: Context, banco: AppDatabase, companyId: String): Flow<ExportProgress> = flow {
+    // FUNÇÃO ATUALIZADA: AGORA RECEBE O MAPEAMENTO COMO PARÂMETRO
+    fun exportarPlanilhaCompleta(
+        context: Context,
+        banco: AppDatabase,
+        companyId: String,
+        mapeamento: MapeamentoPlanilha? // <-- PARÂMETRO NOVO
+    ): Flow<ExportProgress> = flow {
         emit(ExportProgress.InProgress(0))
 
         val prefs = context.getSharedPreferences("inventario_prefs", Context.MODE_PRIVATE)
@@ -35,7 +36,8 @@ object LogHelper {
             val jsonArray = JSONArray(jsonCabecalho)
             for (i in 0 until jsonArray.length()) add(jsonArray.getString(i))
         }
-        val mapeamento = banco.mapeamentoDao().buscarPrimeiro()
+
+        // AGORA USAMOS O MAPEAMENTO RECEBIDO
         if (mapeamento == null) {
             emit(ExportProgress.Error("Mapeamento da planilha não encontrado."))
             return@flow
@@ -56,10 +58,10 @@ object LogHelper {
             headerRowInventario.createCell(index).setCellValue(nomeColuna)
         }
 
-        // MUDANÇA: O loop principal agora calcula e emite o progresso.
         todosOsItens.forEachIndexed { index, item ->
             val row = sheetInventario.createRow(index + 1)
             cabecalhoOriginal.forEachIndexed { colIndex, nomeColuna ->
+                // LÓGICA ATUALIZADA PARA USAR OS CAMPOS CORRETOS
                 val valor = when (cabecalhoOriginal.indexOf(nomeColuna)) {
                     mapeamento.colunaEpc -> item.tag
                     mapeamento.colunaNome -> item.desc
@@ -88,7 +90,8 @@ object LogHelper {
         emit(ExportProgress.Error(e.message ?: "Ocorreu um erro desconhecido durante a exportação."))
     }
 
-    // --- FUNÇÃO 2: EXPORTAR APENAS O LOG DE EDIÇÕES MANUAIS ---
+    // O RESTANTE DO ARQUIVO CONTINUA IGUAL...
+
     suspend fun exportarLogDeEdicoes(context: Context, banco: AppDatabase): File? {
         try {
             val logsDeEdicao = banco.logEdicaoDao().listarTodos()

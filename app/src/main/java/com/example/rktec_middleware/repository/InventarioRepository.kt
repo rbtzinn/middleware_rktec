@@ -4,41 +4,38 @@ import android.net.Uri
 import android.util.Log
 import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.firestore.ktx.toObject
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.nio.charset.Charset
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class InventarioRepository @Inject constructor(private val inventarioDao: InventarioDao) {
+class InventarioRepository @Inject constructor(
+    private val inventarioDao: InventarioDao,
+    private val gson: Gson
+) {
 
-    private val inventarioCollection = Firebase.firestore.collection("inventario")
-
-    suspend fun listarTodosPorEmpresa(companyId: String): List<ItemInventario> =
-        inventarioDao.listarTodosPorEmpresa(companyId)
-
-    suspend fun buscarPorTag(tag: String, companyId: String): ItemInventario? =
-        inventarioDao.buscarPorTag(tag, companyId)
-
-    suspend fun corrigirSetor(epc: String, novoSetor: String, companyId: String) =
-        inventarioDao.corrigirSetor(epc, novoSetor, companyId)
-
-    suspend fun limparInventarioPorEmpresa(companyId: String) {
-        inventarioDao.limparInventarioPorEmpresa(companyId)
+    // Funções do banco local (Room)
+    suspend fun listarTodosPorEmpresa(companyId: String): List<ItemInventario> = inventarioDao.listarTodosPorEmpresa(companyId)
+    suspend fun buscarPorTag(tag: String, companyId: String): ItemInventario? = inventarioDao.buscarPorTag(tag, companyId)
+    suspend fun atualizarItem(item: ItemInventario) = inventarioDao.atualizarItem(item)
+    suspend fun corrigirSetor(epc: String, novoSetor: String, companyId: String) = inventarioDao.corrigirSetor(epc, novoSetor, companyId)
+    suspend fun limparInventarioPorEmpresa(companyId: String) = inventarioDao.limparInventarioPorEmpresa(companyId)
+    suspend fun temInventarioLocal(companyId: String): Boolean {
+        // Conta quantos itens existem no banco local para essa empresa.
+        // Se for maior que zero, significa que os dados já foram baixados.
+        return inventarioDao.contarItensPorEmpresa(companyId) > 0
     }
-
-    suspend fun atualizarItem(item: ItemInventario) {
-        inventarioDao.atualizarItem(item)
-    }
-
-    // FUNÇÃO DE UPLOAD ATUALIZADA E SIMPLIFICADA
+    // Função de upload da planilha
     suspend fun uploadPlanilhaParaStorage(companyId: String, fileUri: Uri): String {
         val fileName = "importacao-${System.currentTimeMillis()}-${fileUri.lastPathSegment?.replace(" ", "_")}"
         val storageRef = Firebase.storage.reference.child("imports/$companyId/$fileName")
-
         return try {
             storageRef.putFile(fileUri).await()
             storageRef.path
@@ -48,39 +45,29 @@ class InventarioRepository @Inject constructor(private val inventarioDao: Invent
         }
     }
 
-    // ESTA FUNÇÃO NÃO É MAIS USADA NO CLIENTE, O ROBOZINHO (CLOUD FUNCTION) FAZ ISSO
-    /*
-    suspend fun uploadInventarioParaFirestore(companyId: String, itens: List<ItemInventario>) {
-        val batch = Firebase.firestore.batch()
-        itens.forEach { item ->
-            val docRef = inventarioCollection.document()
-            batch.set(docRef, item.copy(companyId = companyId))
-        }
-        batch.commit().await()
-    }
-    */
+    // ÚNICA FUNÇÃO DE SINCRONIZAÇÃO: Baixar e processar o JSON
+    suspend fun baixarInventarioEArmazenar(companyId: String, jsonPath: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d("InventarioRepository", "Iniciando download do JSON de: $jsonPath")
+                val storageRef = Firebase.storage.reference.child(jsonPath)
+                val maxDownloadSize: Long = 20 * 1024 * 1024 // 20MB (aumentado por segurança)
+                val bytes = storageRef.getBytes(maxDownloadSize).await()
 
-    suspend fun limparInventarioDoFirestore(companyId: String) {
-        val snapshot = inventarioCollection.whereEqualTo("companyId", companyId).get().await()
-        val batch = Firebase.firestore.batch()
-        snapshot.documents.forEach { doc ->
-            batch.delete(doc.reference)
-        }
-        batch.commit().await()
-    }
+                val jsonString = bytes.toString(Charset.defaultCharset())
+                val listType = object : TypeToken<List<ItemInventario>>() {}.type
+                val itens = gson.fromJson<List<ItemInventario>>(jsonString, listType)
 
-    suspend fun syncInventarioDoFirestore(companyId: String): List<ItemInventario> {
-        return try {
-            val snapshot = inventarioCollection.whereEqualTo("companyId", companyId).get().await()
-            val itens = snapshot.map { it.toObject<ItemInventario>() }
-            if (itens.isNotEmpty()) {
+                Log.d("InventarioRepository", "Parse de ${itens.size} itens a partir do JSON bem-sucedido.")
+
                 inventarioDao.limparInventarioPorEmpresa(companyId)
                 inventarioDao.inserirTodos(itens)
+                Log.d("InventarioRepository", "Dados salvos no banco de dados local (Room).")
+
+            } catch (e: Exception) {
+                Log.e("InventarioRepository", "Erro ao sincronizar inventário via JSON", e)
+                throw e
             }
-            itens
-        } catch (e: Exception) {
-            Log.e("InventarioRepository", "Erro ao sincronizar inventário", e)
-            emptyList()
         }
     }
 }

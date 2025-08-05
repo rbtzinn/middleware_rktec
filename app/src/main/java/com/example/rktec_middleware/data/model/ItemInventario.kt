@@ -13,5 +13,6 @@ data class ItemInventario(
     var localizacao: String = "",
     var loja: String = "",
     val colunasExtras: Map<String, String> = emptyMap(),
-    val companyId: String = ""
+    val companyId: String = "",
+    val originalRow: Int = 0
 )

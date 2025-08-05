@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "889612337320",
-    "project_id": "rktec-3b6ba",
-    "storage_bucket": "rktec-3b6ba.firebasestorage.app"
+    "project_number": "886597954737",
+    "project_id": "rktec-app-novo",
+    "storage_bucket": "rktec-app-novo.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:889612337320:android:4a5fcaf0a05c166b2e029d",
+        "mobilesdk_app_id": "1:886597954737:android:8feffea743a15472048690",
         "android_client_info": {
           "package_name": "com.example.rktec_middleware"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCNSsIoEcG8b7Dt4UkUlAONJb2e2aEn5Ec"
+          "current_key": "AIzaSyBEF85w1FLe0RlCeWAEmrwjW3yBmtrEUPk"
         }
       ],
       "services": {

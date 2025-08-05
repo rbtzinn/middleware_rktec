@@ -12,7 +12,6 @@ import com.example.rktec_middleware.data.model.*
     entities = [
         ItemInventario::class,
         EpcTag::class,
-        MapeamentoPlanilha::class,
         LogMapeamento::class,
         Usuario::class,
         LogGerenciamentoUsuario::class,
@@ -20,13 +19,12 @@ import com.example.rktec_middleware.data.model.*
         ItemSessao::class,
         LogEdicaoItem::class
     ],
-    version = 19
+    version = 21
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
     abstract fun coletaDao(): ColetaDao
-    abstract fun mapeamentoDao(): MapeamentoDao
     abstract fun logMapeamentoDao(): LogMapeamentoDao
     abstract fun usuarioDao(): UsuarioDao
     abstract fun logGerenciamentoUsuarioDao(): LogGerenciamentoUsuarioDao

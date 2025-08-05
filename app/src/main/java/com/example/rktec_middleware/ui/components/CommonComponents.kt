@@ -104,23 +104,36 @@ fun StandardTextField(
     )
 }
 
+// NOVA VERSÃO (COM LÓGICA DE LOADING)
 @Composable
 fun PrimaryButton(
     onClick: () -> Unit,
     text: String,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    isLoading: Boolean = false // <-- NOVO PARÂMETRO
 ) {
     Button(
         onClick = onClick,
-        enabled = enabled,
+        // O botão fica desativado se 'enabled' for false OU se estiver carregando
+        enabled = enabled && !isLoading,
         modifier = modifier
             .fillMaxWidth()
             .height(Dimens.ComponentHeight),
         shape = MaterialTheme.shapes.large,
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge)
+        // Se estiver carregando, mostra o indicador de progresso
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 3.dp
+            )
+        } else {
+            // Senão, mostra o texto normal
+            Text(text = text, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 

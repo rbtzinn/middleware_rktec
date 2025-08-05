@@ -16,6 +16,15 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
     object GerenciamentoUsuarios : Screen("gerenciamento_usuarios")
     object Historico : Screen("historico")
     object Perfil : Screen("perfil")
+
+    // NOVA ROTA ADICIONADA AQUI
+    object AguardandoProcessamento : Screen(
+        route = "aguardando_processamento/{companyId}",
+        arguments = listOf(navArgument("companyId") { type = NavType.StringType })
+    ) {
+        fun createRoute(companyId: String) = "aguardando_processamento/$companyId"
+    }
+
     object DetalheHistorico : Screen(
         route = "detalhe_historico/{sessaoId}",
         arguments = listOf(navArgument("sessaoId") { type = NavType.LongType })
@@ -23,7 +32,6 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
         fun createRoute(sessaoId: Long) = "detalhe_historico/$sessaoId"
     }
 
-    // Rota que precisa de argumentos para funcionar
     object LeituraInventario : Screen(
         route = "leitura_inventario/{filtroLoja}/{filtroSetor}",
         arguments = listOf(
@@ -31,7 +39,6 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
             navArgument("filtroSetor") { type = NavType.StringType; nullable = true }
         )
     ) {
-        // Função auxiliar para criar a rota com os argumentos preenchidos de forma segura
         fun createRoute(loja: String?, setor: String?) = "leitura_inventario/${loja ?: "null"}/${setor ?: "null"}"
     }
 }

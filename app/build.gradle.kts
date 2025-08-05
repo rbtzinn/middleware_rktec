@@ -84,6 +84,8 @@ dependencies {
     implementation ("com.google.firebase:firebase-firestore-ktx:25.1.4")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.android.gms:play-services-auth:21.3.0")
+    implementation ("com.google.code.gson:gson:2.10.1")
+
 
     // ROOM (AQUI ESTÁ CERTO!)
     implementation("androidx.room:room-runtime:2.6.1")

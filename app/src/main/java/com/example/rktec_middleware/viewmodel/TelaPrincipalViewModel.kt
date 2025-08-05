@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.data.model.ExportProgress
 import com.example.rktec_middleware.data.model.SessaoInventario
-import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
@@ -22,7 +21,7 @@ import javax.inject.Inject
 data class DashboardData(
     val totalItensBase: Int = 0,
     val ultimaSessao: SessaoInventario? = null,
-    val nomeEmpresa: String = "" // NOVO CAMPO
+    val nomeEmpresa: String = ""
 )
 
 @HiltViewModel
@@ -55,33 +54,53 @@ class TelaPrincipalViewModel @Inject constructor(
                     val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
                     val totalItens = inventarioRepository.listarTodosPorEmpresa(companyId).size
 
-                    historicoRepository.getTodasSessoes().collect { sessoes ->
-                        val ultimaSessaoDaEmpresa = sessoes.filter { it.companyId == companyId }.firstOrNull()
+                    // Usando .firstOrNull() diretamente no Flow para pegar o último item
+                    val ultimaSessaoDaEmpresa = historicoRepository.getTodasSessoes()
+                        .map { sessoes -> sessoes.filter { it.companyId == companyId }.maxByOrNull { it.dataHora } }
+                        .firstOrNull()
 
-                        _dashboardData.value = DashboardData(
-                            totalItensBase = totalItens,
-                            ultimaSessao = ultimaSessaoDaEmpresa,
-                            nomeEmpresa = empresa?.nome ?: "Empresa não encontrada" // ATUALIZA O NOME
-                        )
-                    }
+                    _dashboardData.value = DashboardData(
+                        totalItensBase = totalItens,
+                        ultimaSessao = ultimaSessaoDaEmpresa,
+                        nomeEmpresa = empresa?.nome ?: "Empresa não encontrada"
+                    )
                 }
             }
         }
     }
 
+    // ##### FUNÇÃO CORRIGIDA ABAIXO #####
     fun exportarPlanilhaCompleta() {
         viewModelScope.launch(Dispatchers.IO) {
+            _exportState.value = ExportProgress.InProgress(0) // Inicia o estado de carregamento
             val email = FirebaseAuth.getInstance().currentUser?.email
-            if (email != null) {
-                val usuario = usuarioRepository.buscarPorEmail(email)
-                usuario?.companyId?.let { companyId ->
-                    LogHelper.exportarPlanilhaCompleta(context, appDatabase, companyId)
-                        .collect { progress ->
-                            _exportState.value = progress
-                        }
-                } ?: run {
-                    _exportState.value = ExportProgress.Error("Usuário não encontrado para exportação.")
-                }
+            if (email == null) {
+                _exportState.value = ExportProgress.Error("Usuário não autenticado.")
+                return@launch
+            }
+
+            val usuario = usuarioRepository.buscarPorEmail(email)
+            val companyId = usuario?.companyId
+            if (companyId == null) {
+                _exportState.value = ExportProgress.Error("ID da empresa não encontrado para o usuário.")
+                return@launch
+            }
+
+            // PASSO 1: Buscar o mapeamento no Firestore usando o repositório
+            val mapeamento = usuarioRepository.buscarConfiguracaoMapeamento(companyId)
+            if (mapeamento == null) {
+                _exportState.value = ExportProgress.Error("Configuração de mapeamento da planilha não foi encontrada.")
+                return@launch
+            }
+
+            // PASSO 2: Chamar o LogHelper com o mapeamento que foi encontrado
+            LogHelper.exportarPlanilhaCompleta(
+                context = context,
+                banco = appDatabase,
+                companyId = companyId,
+                mapeamento = mapeamento // <-- Passando o parâmetro que faltava
+            ).collect { progress ->
+                _exportState.value = progress
             }
         }
     }

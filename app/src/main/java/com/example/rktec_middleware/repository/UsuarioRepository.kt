@@ -36,6 +36,20 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
         }
     }
 
+    suspend fun buscarConfiguracaoMapeamento(companyId: String): MapeamentoPlanilha? {
+        return try {
+            val document = empresasCollection.document(companyId)
+                .collection("config")
+                .document("mapeamento")
+                .get()
+                .await()
+            document.toObject<MapeamentoPlanilha>()
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao buscar mapeamento", e)
+            null
+        }
+    }
+
     suspend fun buscarEmpresaPorId(companyId: String): Empresa? {
         return try {
             val document = empresasCollection.document(companyId).get().await()

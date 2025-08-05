@@ -6,6 +6,7 @@ import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.gson.Gson // IMPORT ADICIONADO
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,6 +16,13 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    // Adicionado de volta: ensina o Hilt a criar um objeto Gson.
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        return Gson()
+    }
 
     @Provides
     @Singleton
@@ -34,10 +42,11 @@ object AppModule {
         return UsuarioRepository(db.usuarioDao())
     }
 
+    // Atualizado para receber o Gson
     @Provides
     @Singleton
-    fun provideInventarioRepository(db: AppDatabase): InventarioRepository {
-        return InventarioRepository(db.inventarioDao())
+    fun provideInventarioRepository(db: AppDatabase, gson: Gson): InventarioRepository {
+        return InventarioRepository(db.inventarioDao(), gson)
     }
 
     @Provides

@@ -6,11 +6,11 @@ import com.example.rktec_middleware.data.model.ItemInventario
 @Dao
 interface InventarioDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun inserirTodos(items: List<ItemInventario>)
-
     @Query("DELETE FROM itens_inventario WHERE companyId = :companyId")
     suspend fun limparInventarioPorEmpresa(companyId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun inserirTodos(itens: List<ItemInventario>)
 
     @Query("SELECT * FROM itens_inventario WHERE companyId = :companyId")
     suspend fun listarTodosPorEmpresa(companyId: String): List<ItemInventario>
@@ -23,4 +23,7 @@ interface InventarioDao {
 
     @Update
     suspend fun atualizarItem(item: ItemInventario)
+
+    @Query("SELECT COUNT(tag) FROM itens_inventario WHERE companyId = :companyId")
+    suspend fun contarItensPorEmpresa(companyId: String): Int
 }

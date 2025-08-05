@@ -6,13 +6,12 @@ import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
-import com.example.rktec_middleware.viewmodel.AuthState.Autenticado
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 sealed class AuthState {
     object Carregando : AuthState()
@@ -38,40 +37,37 @@ class AuthViewModel @Inject constructor(
                 usuarioRepository.escutarMudancasUsuario(firebaseUser.email!!)
                     .collect { usuarioDaNuvem ->
                         if (usuarioDaNuvem != null) {
-                            // Usuário existe no Firestore
                             usuarioRepository.cadastrarUsuario(usuarioDaNuvem)
 
                             if (usuarioDaNuvem.ativo) {
-                                // Usuário está ativo, verificar a empresa
                                 val empresa = usuarioRepository.buscarEmpresaPorId(usuarioDaNuvem.companyId)
                                 val empresaConfigurada = empresa?.planilhaImportada ?: false
 
-                                if (empresaConfigurada) {
-                                    inventarioRepository.syncInventarioDoFirestore(usuarioDaNuvem.companyId)
+                                // ##### LÓGICA DE SINCRONIZAÇÃO INTELIGENTE #####
+                                // Só baixa o inventário se a empresa estiver configurada E
+                                // se não houver dados salvos localmente.
+                                if (empresaConfigurada && !inventarioRepository.temInventarioLocal(usuarioDaNuvem.companyId)) {
+                                    empresa?.inventarioJsonPath?.let { path ->
+                                        inventarioRepository.baixarInventarioEArmazenar(usuarioDaNuvem.companyId, path)
+                                    }
                                 }
-                                _authState.value = AuthState.Autenticado(usuarioDaNuvem, empresaConfigurada)
 
+                                _authState.value = AuthState.Autenticado(usuarioDaNuvem, empresaConfigurada)
                             } else {
-                                // Usuário foi desativado
-                                FirebaseAuth.getInstance().signOut()
-                                _authState.value = AuthState.NaoAutenticado
+                                logout()
                             }
                         } else {
-                            // Usuário autenticado no Firebase Auth, mas sem registro no Firestore.
-                            // Isso pode acontecer se o registro for excluído manualmente.
-                            FirebaseAuth.getInstance().signOut()
-                            _authState.value = AuthState.NaoAutenticado
+                            logout()
                         }
                     }
             } else {
-                // Nenhum usuário logado no Firebase Auth
                 _authState.value = AuthState.NaoAutenticado
             }
         }
     }
 
-    fun onLoginSucesso(usuario: Usuario, inventarioSincronizado: Boolean) {
-        _authState.value = Autenticado(usuario, inventarioSincronizado)
+    fun onLoginSucesso() {
+        verificarEstadoAutenticacao()
     }
 
     fun setEmpresaConfigurada(configurada: Boolean) {
@@ -91,13 +87,13 @@ class AuthViewModel @Inject constructor(
     fun promoverUsuarioAtualParaAdmin() {
         viewModelScope.launch {
             val estadoAtual = _authState.value
-            if (estadoAtual is Autenticado) {
+            if (estadoAtual is AuthState.Autenticado) {
                 val usuario = estadoAtual.usuario
                 if (usuario.tipo != TipoUsuario.ADMIN) {
                     val usuarioAdmin = usuario.copy(tipo = TipoUsuario.ADMIN)
                     usuarioRepository.atualizarUsuario(usuarioAdmin)
-                    }
                 }
             }
         }
     }
+}

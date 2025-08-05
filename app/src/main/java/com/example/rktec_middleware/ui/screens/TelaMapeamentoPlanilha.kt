@@ -152,7 +152,7 @@ fun TelaMapeamentoPlanilha(
                         text = if (isLoading) "Processando..." else "Confirmar e Iniciar",
                         enabled = indexEpc != null && !isLoading
                     )
-                    SecondaryTextButton(onClick = onCancelar, text = "Cancelar", enabled = !isLoading)
+                    SecondaryTextButton(onClick = onCancelar, text = "Cancelar")
                 }
             }
         }

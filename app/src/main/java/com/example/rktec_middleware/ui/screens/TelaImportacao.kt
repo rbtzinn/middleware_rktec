@@ -61,9 +61,10 @@ fun TelaImportacao(
         TelaMapeamentoPlanilha(
             uri = uriParaMapeamento!!,
             usuario = usuario,
-            onSalvar = { totalItens ->
+            onSalvar = { // <-- CORRIGIDO: NENHUM PARÂMETRO
                 uriParaMapeamento = null
-                onConcluido("Importação de $totalItens itens concluída com sucesso!")
+                // A mensagem de sucesso agora vem do ViewModel, então podemos usar uma genérica aqui
+                onConcluido("A importação foi iniciada.")
             },
             onCancelar = {
                 uriParaMapeamento = null
