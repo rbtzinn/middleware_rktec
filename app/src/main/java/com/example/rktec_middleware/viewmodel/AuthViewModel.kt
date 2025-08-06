@@ -12,12 +12,27 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlin.onFailure
+import kotlin.onSuccess
 
+// ##### PASSO 1: ADICIONAR O NOVO ESTADO "INATIVO" #####
 sealed class AuthState {
     object Carregando : AuthState()
     object NaoAutenticado : AuthState()
     data class Autenticado(val usuario: Usuario, val empresaJaConfigurada: Boolean) : AuthState()
+    data class AguardandoVerificacao(val email: String?) : AuthState()
+    data class Inativo(val usuario: Usuario) : AuthState() // Usuário existe mas está com ativo = false
 }
+
+// State para controlar a UI da tela de reativação
+sealed class ReativacaoState {
+    object Idle : ReativacaoState()
+    object Loading : ReativacaoState()
+    object Success : ReativacaoState()
+    data class Error(val message: String) : ReativacaoState()
+}
+
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
@@ -28,44 +43,89 @@ class AuthViewModel @Inject constructor(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Carregando)
     val authState: StateFlow<AuthState> = _authState
 
+    private val _reativacaoState = MutableStateFlow<ReativacaoState>(ReativacaoState.Idle)
+    val reativacaoState: StateFlow<ReativacaoState> = _reativacaoState.asStateFlow()
+
     fun verificarEstadoAutenticacao() {
         viewModelScope.launch {
             _authState.value = AuthState.Carregando
             val firebaseUser = FirebaseAuth.getInstance().currentUser
 
-            if (firebaseUser?.email != null) {
-                usuarioRepository.escutarMudancasUsuario(firebaseUser.email!!)
-                    .collect { usuarioDaNuvem ->
-                        if (usuarioDaNuvem != null) {
-                            usuarioRepository.cadastrarUsuario(usuarioDaNuvem)
-
-                            if (usuarioDaNuvem.ativo) {
-                                val empresa = usuarioRepository.buscarEmpresaPorId(usuarioDaNuvem.companyId)
-                                val empresaConfigurada = empresa?.planilhaImportada ?: false
-
-                                // ##### LÓGICA DE SINCRONIZAÇÃO INTELIGENTE #####
-                                // Só baixa o inventário se a empresa estiver configurada E
-                                // se não houver dados salvos localmente.
-                                if (empresaConfigurada && !inventarioRepository.temInventarioLocal(usuarioDaNuvem.companyId)) {
-                                    empresa?.inventarioJsonPath?.let { path ->
-                                        inventarioRepository.baixarInventarioEArmazenar(usuarioDaNuvem.companyId, path)
-                                    }
-                                }
-
-                                _authState.value = AuthState.Autenticado(usuarioDaNuvem, empresaConfigurada)
-                            } else {
-                                logout()
-                            }
-                        } else {
-                            logout()
-                        }
-                    }
-            } else {
+            if (firebaseUser == null) {
                 _authState.value = AuthState.NaoAutenticado
+                return@launch
+            }
+
+            // Garante que temos o status de verificação mais recente do usuário
+            firebaseUser.reload().addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    logout()
+                    return@addOnCompleteListener
+                }
+
+                // ##### VERIFICAÇÃO DE E-MAIL REATIVADA #####
+                if (!firebaseUser.isEmailVerified) {
+                    _authState.value = AuthState.AguardandoVerificacao(firebaseUser.email)
+                    return@addOnCompleteListener
+                }
+
+                // Se o e-mail está verificado, continuamos para a lógica do app
+                escutarDadosDoUsuario(firebaseUser.email!!)
             }
         }
     }
 
+    // Função auxiliar para evitar repetição de código
+    private fun escutarDadosDoUsuario(email: String) {
+        viewModelScope.launch {
+            usuarioRepository.escutarMudancasUsuario(email)
+                .collect { usuarioDaNuvem ->
+                    if (usuarioDaNuvem != null) {
+                        if (usuarioDaNuvem.ativo) {
+                            val empresa = usuarioRepository.buscarEmpresaPorId(usuarioDaNuvem.companyId)
+                            val empresaConfigurada = empresa?.planilhaImportada ?: false
+
+                            if (empresaConfigurada && !inventarioRepository.temInventarioLocal(usuarioDaNuvem.companyId)) {
+                                empresa?.inventarioJsonPath?.let { path ->
+                                    inventarioRepository.baixarInventarioEArmazenar(usuarioDaNuvem.companyId, path)
+                                }
+                            }
+                            _authState.value = AuthState.Autenticado(usuarioDaNuvem, empresaConfigurada)
+                        } else {
+                            _authState.value = AuthState.Inativo(usuarioDaNuvem)
+                        }
+                    } else {
+                        logout()
+                    }
+                }
+        }
+    }
+
+    // ##### NOVA FUNÇÃO PARA O TIMER #####
+    fun reenviarEmailDeVerificacao() {
+        FirebaseAuth.getInstance().currentUser?.sendEmailVerification()
+    }
+
+    fun reativarComNovoCodigo(novoCodigo: String) {
+        viewModelScope.launch {
+            _reativacaoState.value = ReativacaoState.Loading
+            val estadoAtual = _authState.value
+            if (estadoAtual is AuthState.Inativo) {
+                val resultado = usuarioRepository.reativarETransferirUsuario(estadoAtual.usuario, novoCodigo)
+                resultado.onSuccess {
+                    _reativacaoState.value = ReativacaoState.Success
+                    verificarEstadoAutenticacao()
+                }
+                resultado.onFailure { erro ->
+                    _reativacaoState.value = ReativacaoState.Error(erro.message ?: "Erro desconhecido")
+                }
+            } else {
+                _reativacaoState.value = ReativacaoState.Error("Estado inválido para reativação.")
+            }
+        }
+    }
+
+    // --- Suas funções existentes (sem alterações) ---
     fun onLoginSucesso() {
         verificarEstadoAutenticacao()
     }

@@ -6,14 +6,18 @@ import com.example.rktec_middleware.data.model.Empresa
 import com.example.rktec_middleware.data.model.MapeamentoPlanilha // IMPORT ADICIONADO
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.ktx.toObject
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.jvm.java
 
 @Singleton
 class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) {
@@ -33,6 +37,24 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
         } catch (e: Exception) {
             Log.e("UsuarioRepository", "Erro ao buscar usuário no Firestore", e)
             null
+        }
+    }
+
+    suspend fun resetarStatusDaEmpresa(companyId: String) {
+        try {
+            // FieldValue.delete() remove o campo do documento
+            val updates = mapOf(
+                "planilhaImportada" to false,
+                "statusProcessamento" to FieldValue.delete(),
+                "inventarioJsonPath" to FieldValue.delete(),
+                "totalItensPlanilha" to FieldValue.delete(),
+                "itensProcessados" to FieldValue.delete(),
+                "ultimoArquivo" to FieldValue.delete()
+            )
+            empresasCollection.document(companyId).update(updates).await()
+        } catch (e: Exception) {
+            Log.e("UsuarioRepository", "Erro ao resetar status da empresa", e)
+            throw e
         }
     }
 
@@ -72,6 +94,25 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
             Log.e("UsuarioRepository", "Erro ao salvar mapeamento", e)
             throw e
         }
+    }
+
+    fun getUsuariosPorEmpresaFlow(companyId: String): Flow<List<Usuario>> {
+        return usuarioDao.getUsuariosPorEmpresaFlow(companyId)
+    }
+
+    fun escutarMudancasDeUsuariosDaEmpresa(companyId: String): Flow<List<Usuario>> = callbackFlow {
+        val listener = Firebase.firestore.collection("usuarios")
+            .whereEqualTo("companyId", companyId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error); return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    // Envia a lista completa de usuários sempre que houver uma mudança
+                    trySend(snapshot.toObjects(Usuario::class.java))
+                }
+            }
+        awaitClose { listener.remove() }
     }
 
     suspend fun buscarTodosUsuariosNoFirestore(companyId: String): List<Usuario> {

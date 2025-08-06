@@ -37,7 +37,6 @@ class CadastroViewModel @Inject constructor(
 
     fun cadastrar(nome: String, email: String, senha: String, codigoConvite: String) {
         _cadastroState.value = CadastroState.Loading
-
         // AQUI ESTÁ A CORREÇÃO: .trim() remove espaços e .uppercase() converte para maiúsculas
         val codigoFormatado = codigoConvite.trim().uppercase()
 
@@ -59,6 +58,8 @@ class CadastroViewModel @Inject constructor(
                 FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, senha)
                     .addOnSuccessListener { result ->
                         val user = result.user
+
+                        user?.sendEmailVerification()
                         user?.updateProfile(
                             UserProfileChangeRequest.Builder().setDisplayName(nome).build()
                         )?.addOnCompleteListener {

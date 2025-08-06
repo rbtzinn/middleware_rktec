@@ -12,6 +12,7 @@ import com.example.rktec_middleware.data.model.*
     entities = [
         ItemInventario::class,
         EpcTag::class,
+        // MapeamentoPlanilha::class, <-- REMOVIDO
         LogMapeamento::class,
         Usuario::class,
         LogGerenciamentoUsuario::class,
@@ -19,18 +20,19 @@ import com.example.rktec_middleware.data.model.*
         ItemSessao::class,
         LogEdicaoItem::class
     ],
-    version = 21
+    version = 22, // Aumentamos a versão para forçar a atualização
+    exportSchema = false // Adicionado para remover o warning de compilação
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun inventarioDao(): InventarioDao
     abstract fun coletaDao(): ColetaDao
+    // abstract fun mapeamentoDao(): MapeamentoDao <-- REMOVIDO
     abstract fun logMapeamentoDao(): LogMapeamentoDao
     abstract fun usuarioDao(): UsuarioDao
     abstract fun logGerenciamentoUsuarioDao(): LogGerenciamentoUsuarioDao
     abstract fun logEdicaoDao(): LogEdicaoDao
     abstract fun historicoDao(): HistoricoDao
-
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null

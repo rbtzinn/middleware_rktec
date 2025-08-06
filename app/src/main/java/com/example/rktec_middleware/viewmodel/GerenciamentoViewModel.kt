@@ -10,8 +10,7 @@ import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,36 +23,36 @@ class GerenciamentoViewModel @Inject constructor(
     private val _usuarios = MutableStateFlow<List<Usuario>>(emptyList())
     val usuarios = _usuarios.asStateFlow()
 
-    // NOVO: StateFlow para o nome da empresa
     private val _nomeEmpresa = MutableStateFlow("")
     val nomeEmpresa = _nomeEmpresa.asStateFlow()
 
     val usuarioLogadoEmail: String = FirebaseAuth.getInstance().currentUser?.email ?: ""
 
     init {
-        sincronizarEcarregarUsuarios()
+        // A inicialização agora é muito mais leve
+        carregarDadosIniciaisEIniciarEscutaLocal()
     }
 
-    private fun sincronizarEcarregarUsuarios() {
+    private fun carregarDadosIniciaisEIniciarEscutaLocal() {
         viewModelScope.launch(Dispatchers.IO) {
             val admin = usuarioRepository.buscarPorEmail(usuarioLogadoEmail)
             val companyId = admin?.companyId
 
             if (!companyId.isNullOrEmpty()) {
+                // Carrega o nome da empresa (sua lógica original)
                 val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
                 _nomeEmpresa.value = empresa?.nome ?: "Empresa Desconhecida"
 
-                val usuariosDaNuvem = usuarioRepository.buscarTodosUsuariosNoFirestore(companyId)
-                if (usuariosDaNuvem.isNotEmpty()) {
-                    usuariosDaNuvem.forEach { usuario ->
-                        usuarioRepository.cadastrarUsuario(usuario)
+                // Inicia o "ouvinte" do banco de dados local (Room)
+                usuarioRepository.getUsuariosPorEmpresaFlow(companyId)
+                    .collect { listaDeUsuarios ->
+                        _usuarios.value = listaDeUsuarios
                     }
-                }
-                _usuarios.value = usuarioRepository.listarTodosPorEmpresa(companyId).sortedBy { it.nome }
             }
         }
     }
 
+    // Suas lógicas de atualizar e alternar atividade continuam intactas
     fun atualizarUsuario(usuario: Usuario) {
         viewModelScope.launch(Dispatchers.IO) {
             usuarioRepository.atualizarUsuario(usuario)
@@ -62,8 +61,6 @@ class GerenciamentoViewModel @Inject constructor(
                 usuarioAlvo = usuario.email,
                 detalhes = "Dados do usuário ${usuario.email} foram atualizados."
             )
-            // Recarrega e re-sincroniza a lista para garantir consistência.
-            sincronizarEcarregarUsuarios()
         }
     }
 
@@ -79,8 +76,6 @@ class GerenciamentoViewModel @Inject constructor(
                 usuarioAlvo = usuario.email, motivo = motivo,
                 detalhes = "Status de ${usuario.email} alterado para ${if (novaAtividade) "ativo" else "inativo"}."
             )
-            // Recarrega e re-sincroniza a lista para garantir consistência.
-            sincronizarEcarregarUsuarios()
         }
     }
 }

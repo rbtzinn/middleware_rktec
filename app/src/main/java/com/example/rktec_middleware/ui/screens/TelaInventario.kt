@@ -121,19 +121,19 @@ fun TelaInventario(
                         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
                             StandardDropdown(
                                 label = "Loja",
-                                options = listOf("Todos") + lojasDisponiveis,
-                                selectedOption = filtroLoja ?: "Todos",
+                                options = lojasDisponiveis,
+                                selectedOption = filtroLoja,
                                 onOptionSelected = {
-                                    filtroLoja = if (it == "Todos") null else it
+                                    filtroLoja = it
                                     filtroSetor = null
                                 },
                                 modifier = Modifier.weight(1f)
                             )
                             StandardDropdown(
                                 label = "Setor",
-                                options = listOf("Todos") + setoresDisponiveis,
-                                selectedOption = filtroSetor ?: "Todos",
-                                onOptionSelected = { filtroSetor = if (it == "Todos") null else it },
+                                options = setoresDisponiveis,
+                                selectedOption = filtroSetor,
+                                onOptionSelected = { filtroSetor = it },
                                 modifier = Modifier.weight(1f),
                                 enabled = !filtroLoja.isNullOrBlank()
                             )

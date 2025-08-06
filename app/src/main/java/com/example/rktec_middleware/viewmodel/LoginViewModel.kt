@@ -2,7 +2,6 @@ package com.example.rktec_middleware.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -13,12 +12,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// O estado 'Inativo' foi removido. Este ViewModel só se preocupa com o sucesso ou falha do login.
 sealed class LoginState {
     object Idle : LoginState()
     object Loading : LoginState()
     data class Sucesso(val usuario: Usuario) : LoginState()
     data class Erro(val mensagem: String) : LoginState()
-    data class Inativo(val usuario: Usuario) : LoginState()
 }
 
 @HiltViewModel
@@ -42,9 +41,10 @@ class LoginViewModel @Inject constructor(
         FirebaseAuth.getInstance().signInWithEmailAndPassword(email, senha)
             .addOnSuccessListener { result ->
                 viewModelScope.launch {
-                    // ... (lógica de sincronização que já fizemos)
                     val firebaseUser = result.user ?: return@launch
                     val userEmail = firebaseUser.email ?: ""
+
+                    // A lógica de buscar o usuário no Firestore se ele não existir localmente continua ótima.
                     var usuarioLocal = usuarioRepository.buscarPorEmail(userEmail)
                     if (usuarioLocal == null) {
                         val usuarioFirestore = usuarioRepository.buscarUsuarioNoFirestore(userEmail)
@@ -57,10 +57,9 @@ class LoginViewModel @Inject constructor(
                     if (usuarioLocal == null) {
                         FirebaseAuth.getInstance().signOut()
                         _loginState.value = LoginState.Erro("Usuário autenticado, mas não encontrado no sistema. Fale com o administrador.")
-                    } else if (!usuarioLocal.ativo) {
-                        // MUDANÇA: Em vez de erro, emitimos o estado 'Inativo'
-                        _loginState.value = LoginState.Inativo(usuarioLocal)
                     } else {
+                        // MUDANÇA: Se encontrou o usuário, é sempre sucesso!
+                        // A checagem de 'ativo' vs 'inativo' será feita pelo AuthViewModel.
                         _loginState.value = LoginState.Sucesso(usuarioLocal)
                     }
                 }
@@ -70,23 +69,8 @@ class LoginViewModel @Inject constructor(
             }
     }
 
-    // NOVA FUNÇÃO: Para reativar e transferir o usuário
-    fun reativarETransferir(novoCodigoEmpresa: String) {
-        val estadoAtual = _loginState.value
-        if (estadoAtual !is LoginState.Inativo) return
-
-        _loginState.value = LoginState.Loading // Mostra o loading
-
-        viewModelScope.launch {
-            val resultado = usuarioRepository.reativarETransferirUsuario(estadoAtual.usuario, novoCodigoEmpresa)
-            resultado.onSuccess { usuarioAtualizado ->
-                _loginState.value = LoginState.Sucesso(usuarioAtualizado) // Sucesso!
-            }
-            resultado.onFailure { erro ->
-                _loginState.value = LoginState.Erro(erro.message ?: "Falha ao reativar conta.")
-            }
-        }
-    }
+    // A função 'reativarETransferir' foi removida.
+    // Essa lógica agora pertence 100% ao AuthViewModel.
 
     fun resetarEstado() {
         _loginState.value = LoginState.Idle

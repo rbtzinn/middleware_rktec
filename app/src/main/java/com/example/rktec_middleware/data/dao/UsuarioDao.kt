@@ -2,6 +2,7 @@ package com.example.rktec_middleware.data.dao
 
 import androidx.room.*
 import com.example.rktec_middleware.data.model.Usuario
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UsuarioDao {
@@ -22,6 +23,9 @@ interface UsuarioDao {
 
     @Query("SELECT * FROM usuarios WHERE nome = :nome LIMIT 1")
     suspend fun buscarPorNome(nome: String): Usuario?
+
+    @Query("SELECT * FROM usuarios WHERE companyId = :companyId ORDER BY nome ASC")
+    fun getUsuariosPorEmpresaFlow(companyId: String): Flow<List<Usuario>>
 
     @Query("SELECT email FROM usuarios")
     suspend fun listarEmails(): List<String>

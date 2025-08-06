@@ -8,10 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,17 +35,16 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var appDatabase: AppDatabase
-
     private val rfidViewModel: RfidViewModel by viewModels()
     private var lendo = false
 
     @SuppressLint("UnusedBoxWithConstraintsScope")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
             val mainViewModel: MainViewModel = hiltViewModel()
             val themeOption by mainViewModel.themeOption.collectAsState()
+
 
             RKTecMiddlewareTheme(themeOption = themeOption) {
                 val navController = rememberNavController()
@@ -67,14 +65,34 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // ...
+                    is AuthState.AguardandoVerificacao -> {
+                        NavHost(navController = navController, startDestination = Screen.VerificacaoEmail.route) {
+                            composable(Screen.VerificacaoEmail.route) {
+                                TelaVerificacaoEmail(
+                                    email = state.email,
+                                    onVoltarParaLogin = { authViewModel.logout() }
+                                )
+                            }
+                        }
+                    }
+
                     is AuthState.NaoAutenticado -> {
                         NavHost(navController = navController, startDestination = Screen.Autenticacao.route) {
                             composable(Screen.Autenticacao.route) {
                                 FluxoAutenticacao(
-                                    aoLoginSucesso = {
-                                        authViewModel.onLoginSucesso()
-                                    }
+                                    aoLoginSucesso = { authViewModel.onLoginSucesso() }
+                                )
+                            }
+                        }
+                    }
+
+                    // ##### NOVO BLOCO ADICIONADO PARA USUÁRIOS INATIVOS #####
+                    is AuthState.Inativo -> {
+                        NavHost(navController = navController, startDestination = Screen.Reativacao.route) {
+                            composable(Screen.Reativacao.route) {
+                                TelaReativacao(
+                                    authViewModel = authViewModel,
+                                    onLogoutClick = { authViewModel.logout() }
                                 )
                             }
                         }
@@ -83,6 +101,7 @@ class MainActivity : ComponentActivity() {
                     is AuthState.Autenticado -> {
                         val usuarioAutenticado = state.usuario
                         val startDestination = if (state.empresaJaConfigurada) Screen.Principal.route else Screen.Importacao.route
+                        var mostrarDialogLogout by remember { mutableStateOf(false) }
 
                         ModalNavigationDrawer(
                             drawerState = drawerState,
@@ -90,18 +109,9 @@ class MainActivity : ComponentActivity() {
                             drawerContent = {
                                 AppDrawerContent(
                                     usuario = usuarioAutenticado,
-                                    onNavigateToProfile = {
-                                        navController.navigate(Screen.Perfil.route)
-                                        scope.launch { drawerState.close() }
-                                    },
-                                    onNavigateToSettings = {
-                                        navController.navigate(Screen.Configuracoes.route)
-                                        scope.launch { drawerState.close() }
-                                    },
-                                    onLogoutClick = {  // CORRIGIDO!
-                                        authViewModel.logout()
-                                        scope.launch { drawerState.close() }
-                                    },
+                                    onNavigateToProfile = { navController.navigate(Screen.Perfil.route) },
+                                    onNavigateToSettings = { navController.navigate(Screen.Configuracoes.route) },
+                                    onLogoutClick = { mostrarDialogLogout = true },
                                     onCloseDrawer = { scope.launch { drawerState.close() } }
                                 )
                             }
@@ -199,6 +209,27 @@ class MainActivity : ComponentActivity() {
                                 composable(route = Screen.DetalheHistorico.route, arguments = Screen.DetalheHistorico.arguments) {
                                     TelaDetalheHistorico(onVoltar = { navController.popBackStack() })
                                 }
+                            }
+
+                            if (mostrarDialogLogout) {
+                                AlertDialog(
+                                    onDismissRequest = { mostrarDialogLogout = false },
+                                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+                                    title = { Text("Confirmar Saída") },
+                                    text = { Text("Tem certeza que deseja sair da sua conta?") },
+                                    confirmButton = {
+                                        Button(
+                                            onClick = {
+                                                authViewModel.logout()
+                                                mostrarDialogLogout = false
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                        ) { Text("Sair") }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { mostrarDialogLogout = false }) { Text("Cancelar") }
+                                    }
+                                )
                             }
                         }
                     }

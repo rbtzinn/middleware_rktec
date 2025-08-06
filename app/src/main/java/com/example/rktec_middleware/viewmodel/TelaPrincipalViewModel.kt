@@ -1,6 +1,7 @@
 package com.example.rktec_middleware.viewmodel
 
 import android.content.Context
+import android.util.Log // IMPORT ADICIONADO para o log de Sincronia
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.db.AppDatabase
@@ -39,10 +40,41 @@ class TelaPrincipalViewModel @Inject constructor(
     private val _dashboardData = MutableStateFlow(DashboardData())
     val dashboardData: StateFlow<DashboardData> = _dashboardData.asStateFlow()
 
+
     init {
         carregarDadosDashboard()
+        iniciarEscutaDeAtualizacoes()
     }
 
+    private fun iniciarEscutaDeAtualizacoes() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val email = FirebaseAuth.getInstance().currentUser?.email ?: return@launch
+            val usuario = usuarioRepository.buscarPorEmail(email) ?: return@launch
+            val companyId = usuario.companyId
+
+            // Vigia 1: Escuta por mudanças no INVENTÁRIO
+            inventarioRepository.escutarMudancasDoInventario(companyId)
+                .catch { e -> Log.e("Sync", "Erro ao escutar inventário", e) }
+                .collect { itemAtualizado ->
+                    Log.d("Sync", "Item '${itemAtualizado.tag}' recebido. Atualizando Room.")
+                    inventarioRepository.atualizarItem(itemAtualizado)
+                }
+
+            // ##### VIGIA 2 (NOVO): Escuta por mudanças nos USUÁRIOS #####
+            usuarioRepository.escutarMudancasDeUsuariosDaEmpresa(companyId)
+                .catch { e -> Log.e("Sync", "Erro ao escutar usuários", e) }
+                .collect { listaDeUsuariosDaNuvem ->
+                    Log.d("Sync", "${listaDeUsuariosDaNuvem.size} usuários recebidos. Atualizando Room.")
+                    // Salva todos os usuários recebidos no banco local.
+                    // A função 'inserir' já usa OnConflictStrategy.REPLACE, então ela cria ou atualiza.
+                    listaDeUsuariosDaNuvem.forEach { usuario ->
+                        usuarioRepository.cadastrarUsuario(usuario)
+                    }
+                }
+        }
+    }
+
+    // ##### SUA LÓGICA ORIGINAL (INTACTA) #####
     private fun carregarDadosDashboard() {
         viewModelScope.launch(Dispatchers.IO) {
             val email = FirebaseAuth.getInstance().currentUser?.email
@@ -54,7 +86,6 @@ class TelaPrincipalViewModel @Inject constructor(
                     val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
                     val totalItens = inventarioRepository.listarTodosPorEmpresa(companyId).size
 
-                    // Usando .firstOrNull() diretamente no Flow para pegar o último item
                     val ultimaSessaoDaEmpresa = historicoRepository.getTodasSessoes()
                         .map { sessoes -> sessoes.filter { it.companyId == companyId }.maxByOrNull { it.dataHora } }
                         .firstOrNull()
@@ -69,10 +100,10 @@ class TelaPrincipalViewModel @Inject constructor(
         }
     }
 
-    // ##### FUNÇÃO CORRIGIDA ABAIXO #####
+    // ##### SUA LÓGICA ORIGINAL (INTACTA) #####
     fun exportarPlanilhaCompleta() {
         viewModelScope.launch(Dispatchers.IO) {
-            _exportState.value = ExportProgress.InProgress(0) // Inicia o estado de carregamento
+            _exportState.value = ExportProgress.InProgress(0)
             val email = FirebaseAuth.getInstance().currentUser?.email
             if (email == null) {
                 _exportState.value = ExportProgress.Error("Usuário não autenticado.")
@@ -86,25 +117,24 @@ class TelaPrincipalViewModel @Inject constructor(
                 return@launch
             }
 
-            // PASSO 1: Buscar o mapeamento no Firestore usando o repositório
             val mapeamento = usuarioRepository.buscarConfiguracaoMapeamento(companyId)
             if (mapeamento == null) {
                 _exportState.value = ExportProgress.Error("Configuração de mapeamento da planilha não foi encontrada.")
                 return@launch
             }
 
-            // PASSO 2: Chamar o LogHelper com o mapeamento que foi encontrado
             LogHelper.exportarPlanilhaCompleta(
                 context = context,
                 banco = appDatabase,
                 companyId = companyId,
-                mapeamento = mapeamento // <-- Passando o parâmetro que faltava
+                mapeamento = mapeamento
             ).collect { progress ->
                 _exportState.value = progress
             }
         }
     }
 
+    // ##### SUA LÓGICA ORIGINAL (INTACTA) #####
     fun resetExportState() {
         _exportState.value = ExportProgress.Idle
     }

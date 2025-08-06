@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 
 package com.example.rktec_middleware.ui.screens
 
@@ -10,8 +10,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +45,19 @@ fun TelaDebug(
     var itemEditando by remember { mutableStateOf<ItemInventario?>(null) }
     val context = LocalContext.current
 
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            viewModel.carregarInventario()
+        }
+    )
+
+    LaunchedEffect(inventarioCompleto) {
+        isRefreshing = false
+    }
+
+    // Esta lista agora é a fonte para as opções GERAIS
     val listasParaDropdown by remember(inventarioCompleto) {
         derivedStateOf {
             val lojas = inventarioCompleto.map { it.loja.replace("\"", "").trim() }.filter { it.isNotBlank() }.distinct().sorted()
@@ -79,33 +96,48 @@ fun TelaDebug(
                 leadingIcon = { Icon(Icons.Default.Search, "Buscar") }
             )
 
-            Card(
-                shape = MaterialTheme.shapes.medium,
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+            // A lista agora é envolvida por um Box com o modificador .pullRefresh
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .pullRefresh(pullRefreshState)
             ) {
-                Column(Modifier.padding(Dimens.PaddingMedium)) {
-                    Text(
-                        "Total de itens: ${inventarioFiltrado.size} / ${inventarioCompleto.size}",
-                        style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.height(Dimens.PaddingSmall))
-                    if (inventarioCompleto.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Nenhum item de inventário importado.", color = RktTextSecondary)
-                        }
-                    } else {
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
-                            items(inventarioFiltrado, key = { it.tag }) { item ->
-                                ItemDebugCard(item) { itemEditando = item }
+                Card(
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(Modifier.padding(Dimens.PaddingMedium)) {
+                        Text(
+                            "Total de itens: ${inventarioFiltrado.size} / ${inventarioCompleto.size}",
+                            style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(Dimens.PaddingSmall))
+                        if (inventarioCompleto.isEmpty() && !isRefreshing) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Nenhum item de inventário importado.", color = RktTextSecondary)
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(Dimens.PaddingSmall)) {
+                                items(inventarioFiltrado, key = { it.tag }) { item ->
+                                    ItemDebugCard(item) { itemEditando = item }
+                                }
                             }
                         }
                     }
                 }
+
+                // O indicador visual que aparece ao puxar
+                PullRefreshIndicator(
+                    refreshing = isRefreshing,
+                    state = pullRefreshState,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             }
+
             Button(
                 onClick = { mostrarDialogLimparBanco = true },
                 modifier = Modifier
@@ -119,15 +151,23 @@ fun TelaDebug(
         }
     }
 
+
     if (itemEditando != null) {
+        // ##### LÓGICA ATUALIZADA AQUI #####
+        // Garante que a loja e o setor atuais do item sempre apareçam na lista de opções
+        val itemAtual = itemEditando!!
+        val lojasParaDialog = (listasParaDropdown.first + itemAtual.loja)
+            .filter { it.isNotBlank() }.distinct().sorted()
+        val setoresParaDialog = (listasParaDropdown.second + itemAtual.localizacao)
+            .filter { it.isNotBlank() }.distinct().sorted()
+
         DialogEditarItemDebug(
-            item = itemEditando!!,
-            lojasDisponiveis = listasParaDropdown.first,
-            setoresDisponiveis = listasParaDropdown.second,
+            item = itemAtual,
+            lojasDisponiveis = lojasParaDialog, // Passa a lista corrigida
+            setoresDisponiveis = setoresParaDialog, // Passa a lista corrigida
             onDismiss = { itemEditando = null },
             onConfirm = { itemAtualizado ->
                 viewModel.atualizarItem(itemAtualizado)
-                Toast.makeText(context, "Item atualizado!", Toast.LENGTH_SHORT).show()
                 itemEditando = null
             }
         )

@@ -12,12 +12,13 @@ private object AuthRoutes {
     const val LOGIN = "login"
     const val CADASTRO = "cadastro"
     const val ESQUECI_SENHA = "esqueci_senha"
-    const val REATIVACAO = "reativacao"
+    // A rota de Reativação não pertence mais a este fluxo
 }
 
 @Composable
 fun FluxoAutenticacao(
-    aoLoginSucesso: (Usuario) -> Unit
+    // A assinatura da função agora só precisa notificar sobre o sucesso do login.
+    aoLoginSucesso: () -> Unit
 ) {
     val navController = rememberNavController()
     val loginViewModel: LoginViewModel = hiltViewModel()
@@ -26,18 +27,14 @@ fun FluxoAutenticacao(
 
     val loginState by loginViewModel.loginState.collectAsState()
 
-    // MUDANÇA: Navega para a tela de reativação quando o estado muda
-    LaunchedEffect(loginState) {
-        if (loginState is LoginState.Inativo) {
-            navController.navigate(AuthRoutes.REATIVACAO)
-        }
-    }
+    // O LaunchedEffect que checava o estado "Inativo" foi removido.
+    // A MainActivity cuidará disso.
 
     NavHost(navController = navController, startDestination = AuthRoutes.LOGIN) {
         composable(AuthRoutes.LOGIN) {
+            // A chamada de onLoginSucesso foi simplificada
             TelaLogin(
-                viewModel = loginViewModel,
-                onLoginSucesso = aoLoginSucesso,
+                onLoginSucesso = { aoLoginSucesso() },
                 onIrParaCadastro = { navController.navigate(AuthRoutes.CADASTRO) },
                 onEsqueciSenha = { email ->
                     recuperarSenhaViewModel.setEmail(email)
@@ -55,16 +52,6 @@ fun FluxoAutenticacao(
         composable(AuthRoutes.ESQUECI_SENHA) {
             TelaEsqueciSenha(
                 aoVoltarLogin = { navController.popBackStack() }
-            )
-        }
-
-        composable(AuthRoutes.REATIVACAO) {
-            TelaReativacao(
-                viewModel = loginViewModel,
-                onCancel = {
-                    loginViewModel.resetarEstado()
-                    navController.popBackStack()
-                }
             )
         }
     }

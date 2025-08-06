@@ -4,11 +4,15 @@ import android.net.Uri
 import android.util.Log
 import com.example.rktec_middleware.data.dao.InventarioDao
 import com.example.rktec_middleware.data.model.ItemInventario
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.nio.charset.Charset
@@ -27,12 +31,10 @@ class InventarioRepository @Inject constructor(
     suspend fun atualizarItem(item: ItemInventario) = inventarioDao.atualizarItem(item)
     suspend fun corrigirSetor(epc: String, novoSetor: String, companyId: String) = inventarioDao.corrigirSetor(epc, novoSetor, companyId)
     suspend fun limparInventarioPorEmpresa(companyId: String) = inventarioDao.limparInventarioPorEmpresa(companyId)
-    suspend fun temInventarioLocal(companyId: String): Boolean {
-        // Conta quantos itens existem no banco local para essa empresa.
-        // Se for maior que zero, significa que os dados já foram baixados.
-        return inventarioDao.contarItensPorEmpresa(companyId) > 0
-    }
-    // Função de upload da planilha
+    suspend fun temInventarioLocal(companyId: String): Boolean = inventarioDao.contarItensPorEmpresa(companyId) > 0
+
+    // --- Funções de Interação com o Firebase ---
+
     suspend fun uploadPlanilhaParaStorage(companyId: String, fileUri: Uri): String {
         val fileName = "importacao-${System.currentTimeMillis()}-${fileUri.lastPathSegment?.replace(" ", "_")}"
         val storageRef = Firebase.storage.reference.child("imports/$companyId/$fileName")
@@ -45,27 +47,83 @@ class InventarioRepository @Inject constructor(
         }
     }
 
-    // ÚNICA FUNÇÃO DE SINCRONIZAÇÃO: Baixar e processar o JSON
     suspend fun baixarInventarioEArmazenar(companyId: String, jsonPath: String) {
         withContext(Dispatchers.IO) {
             try {
-                Log.d("InventarioRepository", "Iniciando download do JSON de: $jsonPath")
                 val storageRef = Firebase.storage.reference.child(jsonPath)
-                val maxDownloadSize: Long = 20 * 1024 * 1024 // 20MB (aumentado por segurança)
+                val maxDownloadSize: Long = 20 * 1024 * 1024
                 val bytes = storageRef.getBytes(maxDownloadSize).await()
-
                 val jsonString = bytes.toString(Charset.defaultCharset())
                 val listType = object : TypeToken<List<ItemInventario>>() {}.type
                 val itens = gson.fromJson<List<ItemInventario>>(jsonString, listType)
-
-                Log.d("InventarioRepository", "Parse de ${itens.size} itens a partir do JSON bem-sucedido.")
-
                 inventarioDao.limparInventarioPorEmpresa(companyId)
                 inventarioDao.inserirTodos(itens)
-                Log.d("InventarioRepository", "Dados salvos no banco de dados local (Room).")
-
             } catch (e: Exception) {
-                Log.e("InventarioRepository", "Erro ao sincronizar inventário via JSON", e)
+                Log.e("InventarioRepository", "Erro ao sincronizar via JSON", e)
+                throw e
+            }
+        }
+    }
+
+    suspend fun atualizarItemNoFirestore(item: ItemInventario) {
+        try {
+            Firebase.firestore.collection("inventario").document(item.tag).set(item).await()
+            Log.d("InventarioRepository", "Item ${item.tag} atualizado no Firestore.")
+        } catch (e: Exception) {
+            Log.e("InventarioRepository", "Erro ao atualizar item no Firestore", e)
+            throw e
+        }
+    }
+
+    fun escutarMudancasDoInventario(companyId: String): Flow<ItemInventario> = callbackFlow {
+        val listener = Firebase.firestore.collection("inventario")
+            .whereEqualTo("companyId", companyId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error); return@addSnapshotListener
+                }
+                snapshot?.documentChanges?.forEach { change ->
+                    if (change.type == com.google.firebase.firestore.DocumentChange.Type.ADDED ||
+                        change.type == com.google.firebase.firestore.DocumentChange.Type.MODIFIED) {
+                        trySend(change.document.toObject(ItemInventario::class.java))
+                    }
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // ##### FUNÇÕES NOVAS PARA LIMPEZA DE DADOS DE ADMIN #####
+    suspend fun limparInventarioDoFirestore(companyId: String) {
+        try {
+            val snapshot = Firebase.firestore.collection("inventario")
+                .whereEqualTo("companyId", companyId)
+                .get().await()
+            if (snapshot.isEmpty) return
+            val batch = Firebase.firestore.batch()
+            snapshot.documents.forEach { doc -> batch.delete(doc.reference) }
+            batch.commit().await()
+            Log.d("InventarioRepository", "Coleção 'inventario' limpa no Firestore para a empresa $companyId")
+        } catch (e: Exception) {
+            Log.e("InventarioRepository", "Erro ao limpar inventário do Firestore", e)
+            throw e
+        }
+    }
+
+    suspend fun limparJsonDoStorage(companyId: String) {
+        try {
+            val empresaDoc = Firebase.firestore.collection("empresas").document(companyId).get().await()
+            val jsonPath = empresaDoc.getString("inventarioJsonPath")
+
+            if (jsonPath != null && jsonPath.isNotBlank()) {
+                val storageRef = Firebase.storage.reference.child(jsonPath)
+                storageRef.delete().await()
+                Log.d("InventarioRepository", "Arquivo JSON removido do Storage: $jsonPath")
+            }
+        } catch (e: Exception) {
+            if (e is com.google.firebase.storage.StorageException && e.errorCode == com.google.firebase.storage.StorageException.ERROR_OBJECT_NOT_FOUND) {
+                Log.w("InventarioRepository", "Arquivo JSON não encontrado para deletar, o que é esperado.")
+            } else {
+                Log.e("InventarioRepository", "Erro ao limpar JSON do Storage", e)
                 throw e
             }
         }

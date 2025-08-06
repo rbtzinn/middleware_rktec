@@ -95,7 +95,8 @@ class LeituraInventarioViewModel @Inject constructor(
                 val item = todosOsItens.find { it.tag == epc }
                 val status = when {
                     item == null -> StatusItemSessao.ADICIONAL_DESCONHECIDO
-                    item.loja != filtroLoja -> StatusItemSessao.ADICIONAL_OUTRA_LOJA
+                    // A lógica original para checar loja e setor está aqui
+                    filtroLoja != null && item.loja != filtroLoja -> StatusItemSessao.ADICIONAL_OUTRA_LOJA
                     else -> StatusItemSessao.ADICIONAL_MESMA_LOJA
                 }
                 itensSessao.add(ItemSessao(sessaoId = 0, epc = epc, descricao = item?.desc ?: "Item desconhecido", status = status))
