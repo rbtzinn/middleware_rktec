@@ -24,18 +24,18 @@ class HistoricoViewModel @Inject constructor(
     val sessoes = _sessoes.asStateFlow()
 
     init {
-        carregarHistoricoPorEmpresa()
+        // A inicialização agora é muito mais simples e leve
+        carregarHistoricoLocal()
     }
 
-    private fun carregarHistoricoPorEmpresa() {
+    private fun carregarHistoricoLocal() {
         viewModelScope.launch {
             val email = firebaseAuth.currentUser?.email ?: return@launch
-
             val usuario = usuarioRepository.buscarPorEmail(email)
             val companyId = usuario?.companyId ?: return@launch
 
-            historicoRepository.sincronizarSessoesDaNuvem(companyId)
-
+            // Agora, ele apenas "assiste" ao banco de dados local (Room).
+            // O TelaPrincipalViewModel garante que o Room esteja sempre sincronizado.
             historicoRepository.getSessoesPorEmpresa(companyId).collectLatest { sessoesDaEmpresa ->
                 _sessoes.value = sessoesDaEmpresa
             }

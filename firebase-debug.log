@@ -1,0 +1,110 @@
+[debug] [2025-08-04T12:37:25.481Z] ----------------------------------------------------------------------
+[debug] [2025-08-04T12:37:25.501Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\roberto.araujo\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2025-08-04T12:37:25.502Z] CLI Version:   14.11.2
+[debug] [2025-08-04T12:37:25.502Z] Platform:      win32
+[debug] [2025-08-04T12:37:25.502Z] Node Version:  v22.16.0
+[debug] [2025-08-04T12:37:25.503Z] Time:          Mon Aug 04 2025 09:37:25 GMT-0300 (Horário Padrão de Brasília)
+[debug] [2025-08-04T12:37:25.503Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-08-04T12:37:25.768Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-04T12:37:25.769Z] > authorizing via signed-in user (rbtgabriel04@gmail.com)
+[debug] [2025-08-04T12:37:25.769Z] [iam] checking project rktec-3b6ba for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-08-04T12:37:25.770Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:25.770Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:25.771Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions [none]
+[debug] [2025-08-04T12:37:25.772Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions x-goog-quota-user=projects/rktec-3b6ba
+[debug] [2025-08-04T12:37:25.772Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-08-04T12:37:35.720Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions 200
+[debug] [2025-08-04T12:37:35.721Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-08-04T12:37:35.721Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:35.721Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:35.721Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/rktec-3b6ba/serviceAccounts/rktec-3b6ba@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-08-04T12:37:35.721Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/rktec-3b6ba/serviceAccounts/rktec-3b6ba@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-08-04T12:37:40.033Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/rktec-3b6ba/serviceAccounts/rktec-3b6ba@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-08-04T12:37:40.033Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/rktec-3b6ba/serviceAccounts/rktec-3b6ba@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'rktec-3b6ba'...
+[info] 
+[info] i  deploying functions 
+[debug] [2025-08-04T12:37:40.038Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:40.039Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:40.039Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba [none]
+[debug] [2025-08-04T12:37:40.353Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba 200
+[debug] [2025-08-04T12:37:40.353Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba {"projectNumber":"889612337320","projectId":"rktec-3b6ba","lifecycleState":"DELETE_REQUESTED","name":"rktec","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-07-08T21:57:55.869455Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-08-04T12:37:40.470Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:40.470Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:40.471Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/rktec-3b6ba/adminSdkConfig [none]
+[debug] [2025-08-04T12:37:49.695Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/rktec-3b6ba/adminSdkConfig 200
+[debug] [2025-08-04T12:37:49.695Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/rktec-3b6ba/adminSdkConfig {"projectId":"rktec-3b6ba","storageBucket":"rktec-3b6ba.firebasestorage.app"}
+[debug] [2025-08-04T12:37:49.695Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:49.695Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:37:49.695Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/rktec-3b6ba/configs [none]
+[debug] [2025-08-04T12:37:58.807Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/rktec-3b6ba/configs 403
+[debug] [2025-08-04T12:37:58.808Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/rktec-3b6ba/configs {"error":{"code":403,"message":"Permission denied on resource project rktec-3b6ba.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"CONSUMER_INVALID","domain":"googleapis.com","metadata":{"containerInfo":"rktec-3b6ba","service":"runtimeconfig.googleapis.com","consumer":"projects/rktec-3b6ba"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Permission denied on resource project rktec-3b6ba."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console","url":"https://console.developers.google.com"}]}]}}
+[debug] Request to https://runtimeconfig.googleapis.com/v1beta1/projects/rktec-3b6ba/configs had HTTP Error: 403, Permission denied on resource project rktec-3b6ba.
+[debug] [2025-08-04T12:37:58.812Z] Validating nodejs source
+[debug] [2025-08-04T12:38:06.845Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.12.0",
+    "@typescript-eslint/parser": "^5.12.0",
+    "eslint": "^8.9.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.25.4",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.7.3"
+  },
+  "private": true
+}
+[debug] [2025-08-04T12:38:06.857Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2025-08-04T12:38:06.859Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-08-04T12:38:06.885Z] Found firebase-functions binary at 'C:\middleware_rktec\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8665
+
+[debug] [2025-08-04T12:38:08.464Z] Got response from /__/functions.yaml {"endpoints":{"processarPlanilhadeinventario":{"platform":"gcfv2","availableMemoryMb":1024,"timeoutSeconds":540,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"region":["southamerica-east1"],"labels":{},"eventTrigger":{"eventType":"google.cloud.storage.object.v1.finalized","eventFilters":{"bucket":"rktec-3b6ba.appspot.com"},"retry":false},"entryPoint":"processarPlanilhadeinventario"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] i  extensions: ensuring required API firebaseextensions.googleapis.com is enabled... 
+[debug] [2025-08-04T12:38:12.500Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-04T12:38:12.500Z] > authorizing via signed-in user (rbtgabriel04@gmail.com)
+[debug] [2025-08-04T12:38:12.501Z] [iam] checking project rktec-3b6ba for permissions ["firebase.projects.get","firebaseextensions.instances.list"]
+[debug] [2025-08-04T12:38:12.501Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:38:12.501Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:38:12.502Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions [none]
+[debug] [2025-08-04T12:38:12.502Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions x-goog-quota-user=projects/rktec-3b6ba
+[debug] [2025-08-04T12:38:12.502Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-08-04T12:38:22.230Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions 200
+[debug] [2025-08-04T12:38:22.230Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rktec-3b6ba:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-08-04T12:38:22.231Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:38:22.231Z] Checked if tokens are valid: true, expires at: 1754314154923
+[debug] [2025-08-04T12:38:23.123Z] >>> [apiv2][query] GET https://firebaseextensions.googleapis.com/v1beta/projects/rktec-3b6ba/instances pageSize=100&pageToken=
+[debug] [2025-08-04T12:38:33.300Z] <<< [apiv2][status] GET https://firebaseextensions.googleapis.com/v1beta/projects/rktec-3b6ba/instances 403
+[debug] [2025-08-04T12:38:33.300Z] <<< [apiv2][body] GET https://firebaseextensions.googleapis.com/v1beta/projects/rktec-3b6ba/instances {"error":{"code":403,"message":"Permission denied on resource project rktec-3b6ba.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"CONSUMER_INVALID","domain":"googleapis.com","metadata":{"containerInfo":"rktec-3b6ba","service":"firebaseextensions.googleapis.com","consumer":"projects/rktec-3b6ba"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Permission denied on resource project rktec-3b6ba."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console","url":"https://console.developers.google.com"}]}]}}
+[debug] [2025-08-04T12:38:38.320Z] Error: Timed out.
+    at Timeout._onTimeout (C:\Users\roberto.araujo\AppData\Roaming\npm\node_modules\firebase-tools\lib\utils.js:272:49)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+[error] 
+[error] Error: An unexpected error has occurred.

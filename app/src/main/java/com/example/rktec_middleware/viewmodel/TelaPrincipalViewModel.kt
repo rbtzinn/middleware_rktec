@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.collections.isNotEmpty
 
 data class DashboardData(
     val totalItensBase: Int = 0,
@@ -69,6 +70,17 @@ class TelaPrincipalViewModel @Inject constructor(
                     // A função 'inserir' já usa OnConflictStrategy.REPLACE, então ela cria ou atualiza.
                     listaDeUsuariosDaNuvem.forEach { usuario ->
                         usuarioRepository.cadastrarUsuario(usuario)
+                    }
+                }
+
+            historicoRepository.escutarMudancasDeSessoes(companyId)
+                .catch { e -> Log.e("Sync", "Erro ao escutar histórico", e) }
+                .collect { listaDeSessoesDaNuvem ->
+                    Log.d("Sync", "${listaDeSessoesDaNuvem.size} sessões de histórico recebidas. Atualizando Room.")
+                    // Salva todas as sessões recebidas no banco local.
+                    // A função 'inserirSessoes' já usa OnConflictStrategy.REPLACE.
+                    if (listaDeSessoesDaNuvem.isNotEmpty()) {
+                        historicoRepository.inserirSessoes(listaDeSessoesDaNuvem)
                     }
                 }
         }
