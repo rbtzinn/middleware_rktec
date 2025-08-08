@@ -90,8 +90,6 @@ object LogHelper {
         emit(ExportProgress.Error(e.message ?: "Ocorreu um erro desconhecido durante a exportação."))
     }
 
-    // O RESTANTE DO ARQUIVO CONTINUA IGUAL...
-
     suspend fun exportarLogDeEdicoes(context: Context, banco: AppDatabase): File? {
         try {
             val logsDeEdicao = banco.logEdicaoDao().listarTodos()
@@ -184,6 +182,7 @@ object LogHelper {
     // --- FUNÇÕES DE LOG DE USUÁRIOS (RESTAURADAS) ---
     suspend fun registrarGerenciamentoUsuario(
         context: Context,
+        companyId: String,
         usuarioResponsavel: String,
         acao: String,
         usuarioAlvo: String,
@@ -194,14 +193,22 @@ object LogHelper {
         val db = AppDatabase.getInstance(context.applicationContext)
         db.logGerenciamentoUsuarioDao().inserir(
             LogGerenciamentoUsuario(
-                usuarioResponsavel = usuarioResponsavel, dataHora = dataHora, acao = acao,
-                usuarioAlvo = usuarioAlvo, motivo = motivo, detalhes = detalhes
+                id = 0,
+                companyId = companyId,
+                usuarioResponsavel = usuarioResponsavel,
+                dataHora = dataHora,
+                acao = acao,
+                usuarioAlvo = usuarioAlvo,
+                motivo = motivo,
+                detalhes = detalhes
             )
         )
     }
 
+    // ✅ FIX: Removido o parâmetro companyId, pois a busca no DAO não o utiliza.
     suspend fun exportarLogsGerenciamentoUsuarioXlsx(context: Context): File {
         val db = AppDatabase.getInstance(context)
+        // ✅ FIX: Chamada ao banco de dados corrigida para não passar o companyId.
         val logs = db.logGerenciamentoUsuarioDao().listarTodos()
         val workbook = XSSFWorkbook()
         val sheet = workbook.createSheet("Log Usuários")

@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.rktec_middleware.data.model.ExportProgress
-import com.example.rktec_middleware.data.model.SessaoInventario
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.ui.components.AvatarComGestoSecreto
 import com.example.rktec_middleware.ui.components.StandardTextField
@@ -62,11 +61,9 @@ fun TelaPrincipal(
     val usuario = (authState as? AuthState.Autenticado)?.usuario
     val exportState by telaPrincipalViewModel.exportState.collectAsState()
     val dashboardData by telaPrincipalViewModel.dashboardData.collectAsState()
-
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
     var mostrarDialogExportar by remember { mutableStateOf(false) }
     var mostrarDialogLogout by remember { mutableStateOf(false) }
-
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -80,7 +77,7 @@ fun TelaPrincipal(
                 Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
                 telaPrincipalViewModel.resetExportState()
             }
-            else -> { /* Não faz nada */ }
+            else -> {}
         }
     }
 
@@ -114,7 +111,6 @@ fun TelaPrincipal(
             CircularProgressIndicator()
         }
     } else {
-        // LÓGICA DE ARRASTAR PARA O DEBUG RESTAURADA
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val screenWidthPx = with(LocalDensity.current) { constraints.maxWidth.toFloat() }
             val offsetX = remember { Animatable(0f) }
@@ -125,7 +121,6 @@ fun TelaPrincipal(
                 }
             }
 
-            // A TelaDebug continua existindo "por trás"
             TelaDebug(
                 usuarioLogado = usuario.nome,
                 onVoltar = closeDebugScreen,
@@ -224,14 +219,7 @@ fun TelaPrincipal(
                         FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
                         FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
                         FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
-                        FeatureCard(
-                            title = "Histórico de Inventários",
-                            subtitle = "Consulte relatórios de contagens passadas",
-                            icon = Icons.Default.History,
-                            color = MaterialTheme.colorScheme.secondary,
-                            onClick = onHistoricoClick,
-                            description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais."
-                        )
+                        FeatureCard(title = "Histórico de Inventários", subtitle = "Consulte relatórios de contagens passadas", icon = Icons.Default.History, color = MaterialTheme.colorScheme.secondary, onClick = onHistoricoClick, description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais.")
                         FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
                     }
 
@@ -259,7 +247,9 @@ fun TelaPrincipal(
                 if (usuario.tipo == TipoUsuario.ADMIN) {
                     FloatingActionButton(
                         onClick = onGerenciarUsuariosClick,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(Dimens.PaddingLarge),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(Dimens.PaddingLarge),
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
@@ -289,7 +279,15 @@ fun TelaPrincipal(
                             if (codigoDigitado == "@DM2025") {
                                 authViewModel.promoverUsuarioAtualParaAdmin()
                                 scope.launch {
-                                    LogHelper.registrarGerenciamentoUsuario(context, "SISTEMA", "PROMOÇÃO ADM", usuario.email, "Promoção via código secreto", "Usuário promovido a ADMIN pelo código secreto.")
+                                    LogHelper.registrarGerenciamentoUsuario(
+                                        context = context,
+                                        companyId = usuario.companyId,
+                                        usuarioResponsavel = "SISTEMA",
+                                        acao = "PROMOÇÃO ADM",
+                                        usuarioAlvo = usuario.email,
+                                        motivo = "Promoção via código secreto",
+                                        detalhes = "Usuário promovido a ADMIN pelo código secreto."
+                                    )
                                     Toast.makeText(context, "Permissões de Administrador concedidas!", Toast.LENGTH_SHORT).show()
                                     mostrarDialogAdmin = false
                                 }
@@ -345,7 +343,9 @@ private fun DashboardSection(data: DashboardData) {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(Dimens.PaddingMedium),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimens.PaddingMedium),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Default.Inventory2, contentDescription = "Inventário", modifier = Modifier.size(Dimens.IconSizeLarge), tint = MaterialTheme.colorScheme.primary)
@@ -365,7 +365,6 @@ private fun DashboardInfoItem(value: String, label: String, color: Color) {
         Text(label, style = MaterialTheme.typography.bodySmall)
     }
 }
-
 
 @Composable
 private fun ProgressOverlay(
@@ -401,7 +400,6 @@ private fun ProgressOverlay(
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

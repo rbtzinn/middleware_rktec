@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
                                 AppDrawerContent(
                                     usuario = usuarioAutenticado,
                                     onNavigateToProfile = { navController.navigate(Screen.Perfil.route) },
+                                    onNavigateToLogAtividades = { navController.navigate(Screen.LogAtividades.route) },
                                     onNavigateToSettings = { navController.navigate(Screen.Configuracoes.route) },
                                     onLogoutClick = { mostrarDialogLogout = true },
                                     onCloseDrawer = { scope.launch { drawerState.close() } }
@@ -165,6 +166,11 @@ class MainActivity : ComponentActivity() {
                                         onVoltar = { navController.popBackStack() }
                                     )
                                 }
+
+                                composable(Screen.LogAtividades.route) {
+                                    TelaLogAtividades(onVoltar = { navController.popBackStack() })
+                                }
+
                                 composable(Screen.Perfil.route) {
                                     TelaPerfil(
                                         onVoltar = { navController.popBackStack() },

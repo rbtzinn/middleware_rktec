@@ -92,7 +92,6 @@ class InventarioRepository @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    // ##### FUNÇÕES NOVAS PARA LIMPEZA DE DADOS DE ADMIN #####
     suspend fun limparInventarioDoFirestore(companyId: String) {
         try {
             val snapshot = Firebase.firestore.collection("inventario")
@@ -102,28 +101,27 @@ class InventarioRepository @Inject constructor(
             val batch = Firebase.firestore.batch()
             snapshot.documents.forEach { doc -> batch.delete(doc.reference) }
             batch.commit().await()
-            Log.d("InventarioRepository", "Coleção 'inventario' limpa no Firestore para a empresa $companyId")
         } catch (e: Exception) {
             Log.e("InventarioRepository", "Erro ao limpar inventário do Firestore", e)
             throw e
         }
     }
 
+    fun getInventarioPorEmpresaFlow(companyId: String): Flow<List<ItemInventario>> {
+        return inventarioDao.getInventarioPorEmpresaFlow(companyId)
+    }
+
     suspend fun limparJsonDoStorage(companyId: String) {
         try {
             val empresaDoc = Firebase.firestore.collection("empresas").document(companyId).get().await()
             val jsonPath = empresaDoc.getString("inventarioJsonPath")
-
             if (jsonPath != null && jsonPath.isNotBlank()) {
                 val storageRef = Firebase.storage.reference.child(jsonPath)
                 storageRef.delete().await()
-                Log.d("InventarioRepository", "Arquivo JSON removido do Storage: $jsonPath")
             }
         } catch (e: Exception) {
-            if (e is com.google.firebase.storage.StorageException && e.errorCode == com.google.firebase.storage.StorageException.ERROR_OBJECT_NOT_FOUND) {
-                Log.w("InventarioRepository", "Arquivo JSON não encontrado para deletar, o que é esperado.")
-            } else {
-                Log.e("InventarioRepository", "Erro ao limpar JSON do Storage", e)
+            // Ignora o erro se o arquivo não existir
+            if (e !is com.google.firebase.storage.StorageException) {
                 throw e
             }
         }

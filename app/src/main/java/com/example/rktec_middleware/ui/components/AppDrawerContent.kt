@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rktec_middleware.data.model.Usuario
 import com.example.rktec_middleware.ui.theme.Dimens
+import com.example.rktec_middleware.data.model.TipoUsuario
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +21,7 @@ fun AppDrawerContent(
     onNavigateToProfile: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onLogoutClick: () -> Unit,
+    onNavigateToLogAtividades: () -> Unit,
     onCloseDrawer: () -> Unit // Esta função já era passada, agora vamos usá-la
 ) {
     ModalDrawerSheet(
@@ -83,6 +85,19 @@ fun AppDrawerContent(
                 },
                 shape = MaterialTheme.shapes.medium
             )
+            if (usuario.tipo == TipoUsuario.ADMIN) {
+                Spacer(Modifier.height(Dimens.PaddingSmall))
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.ListAlt, contentDescription = null) },
+                    label = { Text("Log de Atividades") },
+                    selected = false,
+                    onClick = {
+                        onNavigateToLogAtividades()
+                        onCloseDrawer()
+                    },
+                    shape = MaterialTheme.shapes.medium
+                )
+            }
         }
 
 

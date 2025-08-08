@@ -153,7 +153,7 @@ fun TelaDebug(
 
 
     if (itemEditando != null) {
-        // ##### LÓGICA ATUALIZADA AQUI #####
+        // ##### LÓGICA ATUALIZADA AQUI (100% ADITIVA) #####
         // Garante que a loja e o setor atuais do item sempre apareçam na lista de opções
         val itemAtual = itemEditando!!
         val lojasParaDialog = (listasParaDropdown.first + itemAtual.loja)
@@ -167,7 +167,7 @@ fun TelaDebug(
             setoresDisponiveis = setoresParaDialog, // Passa a lista corrigida
             onDismiss = { itemEditando = null },
             onConfirm = { itemAtualizado ->
-                viewModel.atualizarItem(itemAtualizado)
+                viewModel.atualizarItem(itemAtualizado) // Lógica original do ViewModel intacta
                 itemEditando = null
             }
         )

@@ -42,22 +42,24 @@ class UsuarioRepository @Inject constructor(private val usuarioDao: UsuarioDao) 
 
     suspend fun resetarStatusDaEmpresa(companyId: String) {
         try {
-            // FieldValue.delete() remove o campo do documento
-            val updates = mapOf(
+            // Deleta a subcoleção de mapeamento
+            val mapeamentoRef = empresasCollection.document(companyId).collection("config").document("mapeamento")
+            mapeamentoRef.delete().await()
+
+            // Reseta os campos no documento principal da empresa
+            empresasCollection.document(companyId).update(mapOf(
                 "planilhaImportada" to false,
-                "statusProcessamento" to FieldValue.delete(),
-                "inventarioJsonPath" to FieldValue.delete(),
-                "totalItensPlanilha" to FieldValue.delete(),
-                "itensProcessados" to FieldValue.delete(),
-                "ultimoArquivo" to FieldValue.delete()
-            )
-            empresasCollection.document(companyId).update(updates).await()
+                "statusProcessamento" to null,
+                "inventarioJsonPath" to null,
+                "totalItensPlanilha" to null,
+                "itensProcessados" to null,
+                "ultimoArquivo" to null
+            )).await()
         } catch (e: Exception) {
             Log.e("UsuarioRepository", "Erro ao resetar status da empresa", e)
             throw e
         }
     }
-
     suspend fun buscarConfiguracaoMapeamento(companyId: String): MapeamentoPlanilha? {
         return try {
             val document = empresasCollection.document(companyId)

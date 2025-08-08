@@ -96,6 +96,10 @@ dependencies {
     implementation ("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("com.google.firebase:firebase-storage-ktx")
 
+    // Biblioteca de Gráficos Vico (VERSÃO NOVA)
+    implementation("com.patrykandpatrick.vico:compose-m3:2.0.0-beta.2")
+    implementation("com.patrykandpatrick.vico:core:2.0.0-beta.2")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -1,7 +1,6 @@
 package com.example.rktec_middleware.viewmodel
 
 import android.content.Context
-import android.util.Log // IMPORT ADICIONADO para o log de Sincronia
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.db.AppDatabase
@@ -18,12 +17,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.collections.isNotEmpty
 
 data class DashboardData(
     val totalItensBase: Int = 0,
     val ultimaSessao: SessaoInventario? = null,
     val nomeEmpresa: String = ""
+)
+
+data class ChartData(
+    val label: String,
+    val value: Float
 )
 
 @HiltViewModel
@@ -41,78 +44,51 @@ class TelaPrincipalViewModel @Inject constructor(
     private val _dashboardData = MutableStateFlow(DashboardData())
     val dashboardData: StateFlow<DashboardData> = _dashboardData.asStateFlow()
 
+    private val _distribuicaoPorSetor = MutableStateFlow<List<ChartData>>(emptyList())
+    val distribuicaoPorSetor: StateFlow<List<ChartData>> = _distribuicaoPorSetor.asStateFlow()
 
     init {
-        carregarDadosDashboard()
-        iniciarEscutaDeAtualizacoes()
+        // A inicialização agora dispara os "vigias" de dados locais.
+        iniciarObservadoresDeDadosLocais()
     }
 
-    private fun iniciarEscutaDeAtualizacoes() {
+    private fun iniciarObservadoresDeDadosLocais() {
         viewModelScope.launch(Dispatchers.IO) {
             val email = FirebaseAuth.getInstance().currentUser?.email ?: return@launch
             val usuario = usuarioRepository.buscarPorEmail(email) ?: return@launch
             val companyId = usuario.companyId
 
-            // Vigia 1: Escuta por mudanças no INVENTÁRIO
-            inventarioRepository.escutarMudancasDoInventario(companyId)
-                .catch { e -> Log.e("Sync", "Erro ao escutar inventário", e) }
-                .collect { itemAtualizado ->
-                    Log.d("Sync", "Item '${itemAtualizado.tag}' recebido. Atualizando Room.")
-                    inventarioRepository.atualizarItem(itemAtualizado)
-                }
+            // Vigia 1: Observa a lista de inventário (para o gráfico e total de itens)
+            inventarioRepository.getInventarioPorEmpresaFlow(companyId)
+                .onEach { inventario ->
+                    // Prepara os dados do gráfico
+                    val contagemPorSetor = inventario
+                        .filter { it.localizacao.isNotBlank() }
+                        .groupBy { it.localizacao }
+                        .map { ChartData(label = it.key, value = it.value.size.toFloat()) }
+                        .sortedByDescending { it.value }
+                    _distribuicaoPorSetor.value = contagemPorSetor
 
-            // ##### VIGIA 2 (NOVO): Escuta por mudanças nos USUÁRIOS #####
-            usuarioRepository.escutarMudancasDeUsuariosDaEmpresa(companyId)
-                .catch { e -> Log.e("Sync", "Erro ao escutar usuários", e) }
-                .collect { listaDeUsuariosDaNuvem ->
-                    Log.d("Sync", "${listaDeUsuariosDaNuvem.size} usuários recebidos. Atualizando Room.")
-                    // Salva todos os usuários recebidos no banco local.
-                    // A função 'inserir' já usa OnConflictStrategy.REPLACE, então ela cria ou atualiza.
-                    listaDeUsuariosDaNuvem.forEach { usuario ->
-                        usuarioRepository.cadastrarUsuario(usuario)
-                    }
+                    // Atualiza o total de itens no dashboard
+                    _dashboardData.update { it.copy(totalItensBase = inventario.size) }
                 }
+                .launchIn(viewModelScope)
 
-            historicoRepository.escutarMudancasDeSessoes(companyId)
-                .catch { e -> Log.e("Sync", "Erro ao escutar histórico", e) }
-                .collect { listaDeSessoesDaNuvem ->
-                    Log.d("Sync", "${listaDeSessoesDaNuvem.size} sessões de histórico recebidas. Atualizando Room.")
-                    // Salva todas as sessões recebidas no banco local.
-                    // A função 'inserirSessoes' já usa OnConflictStrategy.REPLACE.
-                    if (listaDeSessoesDaNuvem.isNotEmpty()) {
-                        historicoRepository.inserirSessoes(listaDeSessoesDaNuvem)
-                    }
+            // Vigia 2: Observa o histórico de sessões (para o card de "Último Inventário")
+            historicoRepository.getSessoesPorEmpresa(companyId)
+                .onEach { sessoes ->
+                    // Atualiza a última sessão no dashboard (pegando a mais recente pela data)
+                    _dashboardData.update { it.copy(ultimaSessao = sessoes.maxByOrNull { s -> s.dataHora }) }
                 }
+                .launchIn(viewModelScope)
+
+            // Carrega o nome da empresa uma única vez
+            val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
+            _dashboardData.update { it.copy(nomeEmpresa = empresa?.nome ?: "Empresa não encontrada") }
         }
     }
 
-    // ##### SUA LÓGICA ORIGINAL (INTACTA) #####
-    private fun carregarDadosDashboard() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val email = FirebaseAuth.getInstance().currentUser?.email
-            if (email != null) {
-                val usuario = usuarioRepository.buscarPorEmail(email)
-                val companyId = usuario?.companyId
-
-                if (companyId != null) {
-                    val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
-                    val totalItens = inventarioRepository.listarTodosPorEmpresa(companyId).size
-
-                    val ultimaSessaoDaEmpresa = historicoRepository.getTodasSessoes()
-                        .map { sessoes -> sessoes.filter { it.companyId == companyId }.maxByOrNull { it.dataHora } }
-                        .firstOrNull()
-
-                    _dashboardData.value = DashboardData(
-                        totalItensBase = totalItens,
-                        ultimaSessao = ultimaSessaoDaEmpresa,
-                        nomeEmpresa = empresa?.nome ?: "Empresa não encontrada"
-                    )
-                }
-            }
-        }
-    }
-
-    // ##### SUA LÓGICA ORIGINAL (INTACTA) #####
+    // --- SUA LÓGICA ORIGINAL DE EXPORTAÇÃO (INTACTA) ---
     fun exportarPlanilhaCompleta() {
         viewModelScope.launch(Dispatchers.IO) {
             _exportState.value = ExportProgress.InProgress(0)
@@ -146,7 +122,6 @@ class TelaPrincipalViewModel @Inject constructor(
         }
     }
 
-    // ##### SUA LÓGICA ORIGINAL (INTACTA) #####
     fun resetExportState() {
         _exportState.value = ExportProgress.Idle
     }

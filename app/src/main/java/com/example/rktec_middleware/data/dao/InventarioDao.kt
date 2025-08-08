@@ -2,6 +2,7 @@ package com.example.rktec_middleware.data.dao
 
 import androidx.room.*
 import com.example.rktec_middleware.data.model.ItemInventario
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface InventarioDao {
@@ -26,4 +27,7 @@ interface InventarioDao {
 
     @Query("SELECT COUNT(tag) FROM itens_inventario WHERE companyId = :companyId")
     suspend fun contarItensPorEmpresa(companyId: String): Int
+
+    @Query("SELECT * FROM itens_inventario WHERE companyId = :companyId ORDER BY originalRow ASC")
+    fun getInventarioPorEmpresaFlow(companyId: String): Flow<List<ItemInventario>>
 }

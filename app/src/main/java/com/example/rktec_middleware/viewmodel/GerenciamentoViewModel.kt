@@ -53,13 +53,32 @@ class GerenciamentoViewModel @Inject constructor(
     }
 
     // Suas lógicas de atualizar e alternar atividade continuam intactas
-    fun atualizarUsuario(usuario: Usuario) {
+    fun atualizarUsuario(usuarioAtualizado: Usuario) {
         viewModelScope.launch(Dispatchers.IO) {
-            usuarioRepository.atualizarUsuario(usuario)
+            // Busca o usuário original para comparar as mudanças
+            val usuarioOriginal = usuarioRepository.buscarUsuarioNoFirestore(usuarioAtualizado.email)
+            if (usuarioOriginal == null) return@launch
+
+            // Lógica para criar detalhes
+            val detalhes = mutableListOf<String>()
+            if (usuarioOriginal.nome != usuarioAtualizado.nome) {
+                detalhes.add("Nome alterado de '${usuarioOriginal.nome}' para '${usuarioAtualizado.nome}'")
+            }
+            if (usuarioOriginal.tipo != usuarioAtualizado.tipo) {
+                detalhes.add("Tipo alterado de '${usuarioOriginal.tipo}' para '${usuarioAtualizado.tipo}'")
+            }
+
+            // Salva a atualização
+            usuarioRepository.atualizarUsuario(usuarioAtualizado)
+
+            // Registra o log detalhado
             LogUtil.logAcaoGerenciamentoUsuario(
-                context = context, usuarioResponsavel = usuarioLogadoEmail, acao = "EDIÇÃO",
-                usuarioAlvo = usuario.email,
-                detalhes = "Dados do usuário ${usuario.email} foram atualizados."
+                context = context,
+                companyId = usuarioAtualizado.companyId,
+                usuarioResponsavel = usuarioLogadoEmail,
+                acao = "EDIÇÃO DE USUÁRIO",
+                usuarioAlvo = usuarioAtualizado.email,
+                detalhes = if (detalhes.isNotEmpty()) detalhes.joinToString(", ") else "Nenhuma alteração de dados."
             )
         }
     }
@@ -70,10 +89,14 @@ class GerenciamentoViewModel @Inject constructor(
             val usuarioAtualizado = usuario.copy(ativo = novaAtividade)
             usuarioRepository.atualizarUsuario(usuarioAtualizado)
 
+            // ✅ FIX: Adicionado companyId, obtido do próprio usuário sendo modificado
             LogUtil.logAcaoGerenciamentoUsuario(
-                context = context, usuarioResponsavel = usuarioLogadoEmail,
+                context = context,
+                companyId = usuario.companyId,
+                usuarioResponsavel = usuarioLogadoEmail,
                 acao = if (novaAtividade) "REATIVAÇÃO" else "DESATIVAÇÃO",
-                usuarioAlvo = usuario.email, motivo = motivo,
+                usuarioAlvo = usuario.email,
+                motivo = motivo,
                 detalhes = "Status de ${usuario.email} alterado para ${if (novaAtividade) "ativo" else "inativo"}."
             )
         }

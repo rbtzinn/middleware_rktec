@@ -7,6 +7,7 @@ import java.io.File
 object LogUtil {
     suspend fun logAcaoGerenciamentoUsuario(
         context: Context,
+        companyId: String, // ✅ FIX: Adicionado companyId
         usuarioResponsavel: String,
         acao: String,
         usuarioAlvo: String,
@@ -15,6 +16,7 @@ object LogUtil {
     ): File? { // agora pode retornar null
         LogHelper.registrarGerenciamentoUsuario(
             context = context,
+            companyId = companyId, // ✅ FIX: Repassando o companyId
             usuarioResponsavel = usuarioResponsavel,
             acao = acao,
             usuarioAlvo = usuarioAlvo,
@@ -22,6 +24,7 @@ object LogUtil {
             detalhes = detalhes
         )
         return try {
+            // ✅ FIX: Chamada de exportação corrigida (não precisa mais do companyId)
             LogHelper.exportarLogsGerenciamentoUsuarioXlsx(context)
         } catch (e: Exception) {
             e.printStackTrace()

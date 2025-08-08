@@ -18,6 +18,7 @@ sealed class Screen(val route: String, val arguments: List<NamedNavArgument> = e
     object Perfil : Screen("perfil")
     object VerificacaoEmail : Screen("verificacao_email")
     object Reativacao : Screen("reativacao")
+    object LogAtividades : Screen("log_atividades")
 
     // NOVA ROTA ADICIONADA AQUI
     object AguardandoProcessamento : Screen(
