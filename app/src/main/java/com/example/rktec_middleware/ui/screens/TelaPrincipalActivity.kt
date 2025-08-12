@@ -171,116 +171,128 @@ fun TelaPrincipal(
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Box(
+                    // ALTERAÇÃO INICIA AQUI:
+                    // Este Box foi adicionado com weight(1f) para ocupar todo o espaço disponível,
+                    // exceto o espaço do rodapé. O FAB será alinhado em relação a este Box,
+                    // garantindo que ele não sobreponha o rodapé.
+                    Box(modifier = Modifier.weight(1f)) {
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(140.dp)
-                                .background(
-                                    Brush.verticalGradient(
-                                        0f to MaterialTheme.colorScheme.primaryContainer,
-                                        1f to MaterialTheme.colorScheme.primary
-                                    )
-                                )
+                                .fillMaxSize() // Preenche o espaço dado pelo Box pai
+                                .verticalScroll(rememberScrollState())
                         ) {
-                            Row(
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .fillMaxWidth()
+                                    .height(140.dp)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            0f to MaterialTheme.colorScheme.primaryContainer,
+                                            1f to MaterialTheme.colorScheme.primary
+                                        )
+                                    )
                             ) {
-                                AvatarComGestoSecreto(
-                                    nomeUsuario = usuario.nome,
-                                    onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
-                                )
-                                Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        SimpleConnectivityIndicator(status = connectivityStatus)
-                                        Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AvatarComGestoSecreto(
+                                        nomeUsuario = usuario.nome,
+                                        onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
+                                    )
+                                    Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            SimpleConnectivityIndicator(status = connectivityStatus)
+                                            Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                                            Text(
+                                                dashboardData.nomeEmpresa,
+                                                style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
+                                            )
+                                        }
                                         Text(
-                                            dashboardData.nomeEmpresa,
-                                            style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
+                                            "Bem-vindo, ${usuario.nome.split(" ").first()}",
+                                            style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
+                                            maxLines = 1,
                                         )
                                     }
-                                    Text(
-                                        "Bem-vindo, ${usuario.nome.split(" ").first()}",
-                                        style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
-                                        maxLines = 1,
-                                    )
-                                }
-                                Spacer(modifier = Modifier.weight(1f))
-                                IconButton(
-                                    onClick = { onMenuClick() },
-                                    modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
-                                ) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    IconButton(
+                                        onClick = { onMenuClick() },
+                                        modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                                    }
                                 }
                             }
-                        }
 
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .offset(y = (-30).dp)
-                                .padding(horizontal = Dimens.PaddingLarge),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
-                        ) {
-                            DashboardSection(dashboardData)
-                            FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
-                            FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
-                            FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
-                            FeatureCard(title = "Histórico de Inventários", subtitle = "Consulte relatórios de contagens passadas", icon = Icons.Default.History, color = MaterialTheme.colorScheme.secondary, onClick = onHistoricoClick, description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais.")
-                            FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Dimens.PaddingMedium),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
-
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .offset(y = (-30).dp)
+                                    .padding(horizontal = Dimens.PaddingLarge),
+                                verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
                             ) {
-                                TextButton(onClick = onSobreClick) {
-                                    Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", modifier = Modifier.size(Dimens.IconSizeSmall))
-                                    Spacer(Modifier.width(Dimens.PaddingSmall))
-                                    Text("Sobre o Sistema", fontWeight = FontWeight.SemiBold)
-                                }
-                                Text("|", color = MaterialTheme.colorScheme.primary)
-                                TextButton(onClick = onAjudaClick) {
-                                    Icon(imageVector = Icons.Default.HelpOutline, contentDescription = "Ajuda", modifier = Modifier.size(Dimens.IconSizeSmall))
-                                    Spacer(Modifier.width(Dimens.PaddingSmall))
-                                    Text("Ajuda e Suporte", fontWeight = FontWeight.SemiBold)
-                                }
+                                DashboardSection(dashboardData)
+                                FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
+                                FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
+                                FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
+                                FeatureCard(title = "Histórico de Inventários", subtitle = "Consulte relatórios de contagens passadas", icon = Icons.Default.History, color = MaterialTheme.colorScheme.secondary, onClick = onHistoricoClick, description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais.")
+                                FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
                             }
+                        } // Fim do Column com scroll
 
-                            Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
+                        // O FAB foi movido para dentro deste Box para que seu alinhamento
+                        // respeite os limites do Box.
+                        if (usuario.tipo == TipoUsuario.ADMIN) {
+                            FloatingActionButton(
+                                onClick = onGerenciarUsuariosClick,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd) // Alinhado dentro do Box com weight(1f)
+                                    .padding(end = Dimens.PaddingLarge, bottom = 4.dp),
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) {
+                                Icon(Icons.Default.ManageAccounts, "Gerenciar Usuários")
+                            }
                         }
+                    } // Fim do Box com weight(1f)
+                    // ALTERAÇÃO TERMINA AQUI
+
+                    // O Rodapé agora está fora do Box com weight, agindo como um limite inferior.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Dimens.PaddingMedium),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
+
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TextButton(onClick = onSobreClick) {
+                                Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", modifier = Modifier.size(Dimens.IconSizeSmall))
+                                Spacer(Modifier.width(Dimens.PaddingSmall))
+                                Text("Sobre o Sistema", fontWeight = FontWeight.SemiBold)
+                            }
+                            Text("|", color = MaterialTheme.colorScheme.primary)
+                            TextButton(onClick = onAjudaClick) {
+                                Icon(imageVector = Icons.Default.HelpOutline, contentDescription = "Ajuda", modifier = Modifier.size(Dimens.IconSizeSmall))
+                                Spacer(Modifier.width(Dimens.PaddingSmall))
+                                Text("Ajuda e Suporte", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
 
-                if (usuario.tipo == TipoUsuario.ADMIN) {
-                    FloatingActionButton(
-                        onClick = onGerenciarUsuariosClick,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(Dimens.PaddingLarge),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ) {
-                        Icon(Icons.Default.ManageAccounts, "Gerenciar Usuários")
-                    }
-                }
+                // O FAB foi REMOVIDO daqui.
 
                 if (mostrarDialogExportar) {
                     AlertDialog(

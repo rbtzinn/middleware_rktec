@@ -1,9 +1,11 @@
 package com.example.rktec_middleware.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.rktec_middleware.data.model.TipoUsuario
 import com.example.rktec_middleware.data.model.Usuario
+import com.example.rktec_middleware.data.repository.AuthRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -13,6 +15,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.tasks.await
 import kotlin.onFailure
 import kotlin.onSuccess
 
