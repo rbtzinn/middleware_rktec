@@ -6,13 +6,12 @@ import com.example.rktec_middleware.data.model.ItemSessao
 import com.example.rktec_middleware.data.model.SessaoInventario
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.channels.awaitClose // IMPORT ADICIONADO
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow // IMPORT ADICIONADO
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.jvm.java
 
 @Singleton
 class HistoricoRepository @Inject constructor(private val historicoDao: HistoricoDao) {
@@ -38,12 +37,19 @@ class HistoricoRepository @Inject constructor(private val historicoDao: Historic
         }
     }
 
+    // ##### FUNÇÃO ATUALIZADA COM A LÓGICA DE LIMPEZA #####
     suspend fun sincronizarSessoesDaNuvem(companyId: String) {
         try {
+            // 1. Busca a lista completa da nuvem
             val snapshot = sessoesCollection
                 .whereEqualTo("companyId", companyId)
                 .get().await()
             val sessoesNuvem = snapshot.toObjects(SessaoInventario::class.java)
+
+            // 2. Apaga os registros locais antigos DAQUELA empresa
+            historicoDao.limparSessoesPorEmpresa(companyId)
+
+            // 3. Insere a lista fresca e completa
             if (sessoesNuvem.isNotEmpty()) {
                 historicoDao.inserirSessoes(sessoesNuvem)
             }
@@ -52,7 +58,6 @@ class HistoricoRepository @Inject constructor(private val historicoDao: Historic
         }
     }
 
-    // ##### FUNÇÕES NOVAS ADICIONADAS PARA O VIGIA #####
     suspend fun inserirSessoes(sessoes: List<SessaoInventario>) {
         historicoDao.inserirSessoes(sessoes)
     }

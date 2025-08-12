@@ -27,58 +27,63 @@ class GerenciamentoViewModel @Inject constructor(
     val nomeEmpresa = _nomeEmpresa.asStateFlow()
 
     val usuarioLogadoEmail: String = FirebaseAuth.getInstance().currentUser?.email ?: ""
+    private var companyId: String? = null
 
     init {
-        // A inicialização agora é muito mais leve
-        carregarDadosIniciaisEIniciarEscutaLocal()
+        sincronizarEIniciarEscuta()
     }
 
-    private fun carregarDadosIniciaisEIniciarEscutaLocal() {
+    private fun sincronizarEIniciarEscuta() {
         viewModelScope.launch(Dispatchers.IO) {
             val admin = usuarioRepository.buscarPorEmail(usuarioLogadoEmail)
-            val companyId = admin?.companyId
+            companyId = admin?.companyId
 
-            if (!companyId.isNullOrEmpty()) {
-                // Carrega o nome da empresa (sua lógica original)
-                val empresa = usuarioRepository.buscarEmpresaPorId(companyId)
-                _nomeEmpresa.value = empresa?.nome ?: "Empresa Desconhecida"
+            val cId = companyId
+            if (cId.isNullOrEmpty()) return@launch
 
-                // Inicia o "ouvinte" do banco de dados local (Room)
-                usuarioRepository.getUsuariosPorEmpresaFlow(companyId)
+            // ----- MUDANÇA PRINCIPAL AQUI -----
+
+            // 1. Começamos a ouvir o banco de dados local IMEDIATAMENTE.
+            // A UI será populada com os usuários em cache assim que o ViewModel for criado.
+            launch {
+                usuarioRepository.getUsuariosPorEmpresaFlow(cId)
                     .collect { listaDeUsuarios ->
                         _usuarios.value = listaDeUsuarios
                     }
             }
+
+            // Carrega o nome da empresa (lógica original intacta)
+            val empresa = usuarioRepository.buscarEmpresaPorId(cId)
+            _nomeEmpresa.value = empresa?.nome ?: "Empresa Desconhecida"
+
+            // 2. AGORA, tentamos sincronizar com a nuvem em segundo plano.
+            // Se estiver offline, o `catch` impedirá que a escuta local seja interrompida.
+            try {
+                val usuariosDaNuvem = usuarioRepository.buscarTodosUsuariosNoFirestore(cId)
+                if (usuariosDaNuvem.isNotEmpty()) {
+                    usuariosDaNuvem.forEach { usuario ->
+                        usuarioRepository.cadastrarUsuario(usuario)
+                    }
+                    // O `collect` que iniciamos acima vai pegar essas atualizações automaticamente.
+                }
+            } catch (e: Exception) {
+                // Quando offline, simplesmente falha em silêncio, pois a UI já tem os dados locais.
+                // Você poderia adicionar um Log aqui se quisesse.
+                println("Falha ao sincronizar usuários: ${e.message}")
+            }
         }
     }
 
-    // Suas lógicas de atualizar e alternar atividade continuam intactas
-    fun atualizarUsuario(usuarioAtualizado: Usuario) {
+    fun atualizarUsuario(usuario: Usuario) {
         viewModelScope.launch(Dispatchers.IO) {
-            // Busca o usuário original para comparar as mudanças
-            val usuarioOriginal = usuarioRepository.buscarUsuarioNoFirestore(usuarioAtualizado.email)
-            if (usuarioOriginal == null) return@launch
-
-            // Lógica para criar detalhes
-            val detalhes = mutableListOf<String>()
-            if (usuarioOriginal.nome != usuarioAtualizado.nome) {
-                detalhes.add("Nome alterado de '${usuarioOriginal.nome}' para '${usuarioAtualizado.nome}'")
-            }
-            if (usuarioOriginal.tipo != usuarioAtualizado.tipo) {
-                detalhes.add("Tipo alterado de '${usuarioOriginal.tipo}' para '${usuarioAtualizado.tipo}'")
-            }
-
-            // Salva a atualização
-            usuarioRepository.atualizarUsuario(usuarioAtualizado)
-
-            // Registra o log detalhado
+            usuarioRepository.atualizarUsuario(usuario)
             LogUtil.logAcaoGerenciamentoUsuario(
                 context = context,
-                companyId = usuarioAtualizado.companyId,
+                companyId = usuario.companyId,
                 usuarioResponsavel = usuarioLogadoEmail,
-                acao = "EDIÇÃO DE USUÁRIO",
-                usuarioAlvo = usuarioAtualizado.email,
-                detalhes = if (detalhes.isNotEmpty()) detalhes.joinToString(", ") else "Nenhuma alteração de dados."
+                acao = "EDIÇÃO",
+                usuarioAlvo = usuario.email,
+                detalhes = "Dados do usuário ${usuario.email} foram atualizados."
             )
         }
     }
@@ -89,7 +94,6 @@ class GerenciamentoViewModel @Inject constructor(
             val usuarioAtualizado = usuario.copy(ativo = novaAtividade)
             usuarioRepository.atualizarUsuario(usuarioAtualizado)
 
-            // ✅ FIX: Adicionado companyId, obtido do próprio usuário sendo modificado
             LogUtil.logAcaoGerenciamentoUsuario(
                 context = context,
                 companyId = usuario.companyId,

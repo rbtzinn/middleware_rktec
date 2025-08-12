@@ -40,11 +40,14 @@ import com.example.rktec_middleware.viewmodel.AuthViewModel
 import com.example.rktec_middleware.viewmodel.AuthState
 import com.example.rktec_middleware.viewmodel.DashboardData
 import com.example.rktec_middleware.viewmodel.TelaPrincipalViewModel
+import com.example.rktec_middleware.ui.components.ConnectivityStatusIndicator
+import com.example.rktec_middleware.util.ConnectivityObserver
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelaPrincipal(
     authViewModel: AuthViewModel,
@@ -55,12 +58,15 @@ fun TelaPrincipal(
     onSobreClick: () -> Unit,
     onGerenciarUsuariosClick: () -> Unit,
     onHistoricoClick: () -> Unit,
+    onAjudaClick: () -> Unit,
     telaPrincipalViewModel: TelaPrincipalViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.authState.collectAsState()
     val usuario = (authState as? AuthState.Autenticado)?.usuario
     val exportState by telaPrincipalViewModel.exportState.collectAsState()
     val dashboardData by telaPrincipalViewModel.dashboardData.collectAsState()
+    val connectivityStatus by telaPrincipalViewModel.connectivityStatus.collectAsState()
+
     var mostrarDialogAdmin by remember { mutableStateOf(false) }
     var mostrarDialogExportar by remember { mutableStateOf(false) }
     var mostrarDialogLogout by remember { mutableStateOf(false) }
@@ -158,89 +164,108 @@ fun TelaPrincipal(
                 modifier = Modifier
                     .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                     .then(dragModifier)
+                    .fillMaxSize()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
-                        .verticalScroll(rememberScrollState())
                 ) {
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    0f to MaterialTheme.colorScheme.primaryContainer,
-                                    1f to MaterialTheme.colorScheme.primary
-                                )
-                            )
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
-                            verticalAlignment = Alignment.CenterVertically
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        0f to MaterialTheme.colorScheme.primaryContainer,
+                                        1f to MaterialTheme.colorScheme.primary
+                                    )
+                                )
                         ) {
-                            AvatarComGestoSecreto(
-                                nomeUsuario = usuario.nome,
-                                onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
-                            )
-                            Spacer(modifier = Modifier.width(Dimens.PaddingMedium))
-                            Column {
-                                Text(
-                                    dashboardData.nomeEmpresa,
-                                    style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
-                                )
-                                Text(
-                                    "Bem-vindo, ${usuario.nome.split(" ").first()}",
-                                    style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
-                                    maxLines = 1,
-                                )
-                            }
-                            Spacer(modifier = Modifier.weight(1f))
-                            IconButton(
-                                onClick = { onMenuClick() },
-                                modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = Dimens.PaddingLarge, vertical = Dimens.PaddingMedium),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                                AvatarComGestoSecreto(
+                                    nomeUsuario = usuario.nome,
+                                    onGestoDetectado = { if (usuario.tipo != TipoUsuario.ADMIN) mostrarDialogAdmin = true }
+                                )
+                                Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        SimpleConnectivityIndicator(status = connectivityStatus)
+                                        Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
+                                        Text(
+                                            dashboardData.nomeEmpresa,
+                                            style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.9f))
+                                        )
+                                    }
+                                    Text(
+                                        "Bem-vindo, ${usuario.nome.split(" ").first()}",
+                                        style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
+                                        maxLines = 1,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = { onMenuClick() },
+                                    modifier = Modifier.background(Color.White.copy(alpha = 0.20f), CircleShape)
+                                ) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                                }
                             }
                         }
-                    }
 
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .offset(y = (-30).dp)
-                            .padding(horizontal = Dimens.PaddingLarge),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
-                    ) {
-                        DashboardSection(dashboardData)
-                        FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
-                        FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
-                        FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
-                        FeatureCard(title = "Histórico de Inventários", subtitle = "Consulte relatórios de contagens passadas", icon = Icons.Default.History, color = MaterialTheme.colorScheme.secondary, onClick = onHistoricoClick, description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais.")
-                        FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Dimens.PaddingMedium),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
-                        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            TextButton(onClick = onSobreClick) {
-                                Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", tint = RktGreen, modifier = Modifier.size(Dimens.IconSizeSmall))
-                                Spacer(Modifier.width(Dimens.PaddingSmall))
-                                Text("Sobre o Sistema", color = RktGreen, fontWeight = FontWeight.SemiBold)
-                            }
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .offset(y = (-30).dp)
+                                .padding(horizontal = Dimens.PaddingLarge),
+                            verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
+                        ) {
+                            DashboardSection(dashboardData)
+                            FeatureCard(title = "Inventário", subtitle = "Controle e acompanhe o estoque", icon = Icons.Default.ListAlt, color = RktGreen, onClick = onInventarioClick, description = "Inicia uma sessão de contagem. Compare as etiquetas lidas com a lista de itens esperados para uma loja ou setor específico, identificando sobras e faltas.")
+                            FeatureCard(title = "Checagem de Item", subtitle = "Verifique uma única etiqueta", icon = Icons.Default.QrCodeScanner, color = RktBlueInfo, onClick = onChecagemClick, description = "Verifique um único item. Digite o código da etiqueta para consultar seus detalhes na base de dados e use o modo 'Localizador' para encontrá-lo fisicamente.")
+                            FeatureCard(title = "Coleta Avulsa", subtitle = "Leia tags sem um inventário prévio", icon = Icons.Default.DocumentScanner, color = RktOrange, onClick = onColetaAvulsaClick, description = "Realiza uma leitura livre, sem vínculo com a base de dados. Ideal para coletar rapidamente todas as etiquetas presentes em uma área ou caixa.")
+                            FeatureCard(title = "Histórico de Inventários", subtitle = "Consulte relatórios de contagens passadas", icon = Icons.Default.History, color = MaterialTheme.colorScheme.secondary, onClick = onHistoricoClick, description = "Acesse um registro detalhado de todas as sessões de inventário já realizadas, incluindo itens encontrados, faltantes e adicionais.")
+                            FeatureCard(title = "Exportar Planilha Final", subtitle = "Gera o relatório mestre com os dados", icon = Icons.Default.UploadFile, color = RktBlueInfo, onClick = { mostrarDialogExportar = true }, description = "Gera e salva um arquivo de planilha (.xlsx) no dispositivo contendo o inventário completo, com todos os itens da base de dados.")
                         }
-                        Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
-                        Text("Todos os direitos reservados", style = MaterialTheme.typography.labelMedium)
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(Dimens.PaddingMedium),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Divider(Modifier.padding(vertical = Dimens.PaddingSmall), color = RktStroke.copy(alpha = 0.5f))
+
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                TextButton(onClick = onSobreClick) {
+                                    Icon(imageVector = Icons.Default.Info, contentDescription = "Sobre", modifier = Modifier.size(Dimens.IconSizeSmall))
+                                    Spacer(Modifier.width(Dimens.PaddingSmall))
+                                    Text("Sobre o Sistema", fontWeight = FontWeight.SemiBold)
+                                }
+                                Text("|", color = MaterialTheme.colorScheme.primary)
+                                TextButton(onClick = onAjudaClick) {
+                                    Icon(imageVector = Icons.Default.HelpOutline, contentDescription = "Ajuda", modifier = Modifier.size(Dimens.IconSizeSmall))
+                                    Spacer(Modifier.width(Dimens.PaddingSmall))
+                                    Text("Ajuda e Suporte", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+
+                            Text("RKTECNOLOGIAS", fontWeight = FontWeight.Bold, color = RktGreen, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                 }
 
@@ -307,6 +332,21 @@ fun TelaPrincipal(
             }
         }
     }
+}
+
+@Composable
+fun SimpleConnectivityIndicator(status: ConnectivityObserver.Status) {
+    val color = when (status) {
+        ConnectivityObserver.Status.Available -> RktGreen
+        ConnectivityObserver.Status.Losing -> Color.Yellow
+        else -> Color.Gray
+    }
+    Box(
+        modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(color)
+    )
 }
 
 @Composable

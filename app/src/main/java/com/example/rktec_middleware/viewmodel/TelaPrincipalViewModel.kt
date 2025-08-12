@@ -9,6 +9,7 @@ import com.example.rktec_middleware.data.model.SessaoInventario
 import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
+import com.example.rktec_middleware.util.ConnectivityObserver
 import com.example.rktec_middleware.util.LogHelper
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,11 +36,18 @@ class TelaPrincipalViewModel @Inject constructor(
     private val appDatabase: AppDatabase,
     private val inventarioRepository: InventarioRepository,
     private val historicoRepository: HistoricoRepository,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    connectivityObserver: ConnectivityObserver
 ) : ViewModel() {
 
     private val _exportState = MutableStateFlow<ExportProgress>(ExportProgress.Idle)
     val exportState: StateFlow<ExportProgress> = _exportState.asStateFlow()
+    val connectivityStatus: StateFlow<ConnectivityObserver.Status> = connectivityObserver.observe()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ConnectivityObserver.Status.Available
+        )
 
     private val _dashboardData = MutableStateFlow(DashboardData())
     val dashboardData: StateFlow<DashboardData> = _dashboardData.asStateFlow()

@@ -187,18 +187,6 @@ fun TelaInventario(
                     modifier = Modifier.padding(Dimens.PaddingMedium)
                 )
             }
-
-            Text(
-                "RKTECNOLOGIAS",
-                style = MaterialTheme.typography.labelMedium,
-                color = RktGreen,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = Dimens.PaddingSmall)
-                    .clickable(onClick = onSobreClick),
-                textAlign = TextAlign.Center
-            )
         }
     }
 

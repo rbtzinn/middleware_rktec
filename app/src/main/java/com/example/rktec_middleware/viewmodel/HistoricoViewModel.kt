@@ -7,6 +7,7 @@ import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.UsuarioRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -24,18 +25,23 @@ class HistoricoViewModel @Inject constructor(
     val sessoes = _sessoes.asStateFlow()
 
     init {
-        // A inicialização agora é muito mais simples e leve
-        carregarHistoricoLocal()
+        // Renomeado para refletir a nova lógica mais robusta
+        sincronizarEcarregarHistoricoLocal()
     }
 
-    private fun carregarHistoricoLocal() {
-        viewModelScope.launch {
+    private fun sincronizarEcarregarHistoricoLocal() {
+        viewModelScope.launch(Dispatchers.IO) {
             val email = firebaseAuth.currentUser?.email ?: return@launch
             val usuario = usuarioRepository.buscarPorEmail(email)
             val companyId = usuario?.companyId ?: return@launch
 
-            // Agora, ele apenas "assiste" ao banco de dados local (Room).
-            // O TelaPrincipalViewModel garante que o Room esteja sempre sincronizado.
+            // ##### LÓGICA ATUALIZADA #####
+            // Passo 1: Busca a lista mais recente do Firestore e atualiza o Room.
+            // Esta é a sua função original, que já funciona perfeitamente para buscar.
+            historicoRepository.sincronizarSessoesDaNuvem(companyId)
+
+            // Passo 2: Inicia a escuta reativa no banco de dados local (Room).
+            // Agora o Room está garantidamente atualizado com tudo da nuvem.
             historicoRepository.getSessoesPorEmpresa(companyId).collectLatest { sessoesDaEmpresa ->
                 _sessoes.value = sessoesDaEmpresa
             }

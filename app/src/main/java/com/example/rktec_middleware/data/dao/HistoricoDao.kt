@@ -27,4 +27,7 @@ interface HistoricoDao {
 
     @Query("SELECT * FROM sessoes_inventario WHERE companyId = :companyId ORDER BY dataHora DESC")
     fun getSessoesPorEmpresa(companyId: String): Flow<List<SessaoInventario>>
+
+    @Query("DELETE FROM sessoes_inventario WHERE companyId = :companyId")
+    suspend fun limparSessoesPorEmpresa(companyId: String)
 }

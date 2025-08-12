@@ -6,6 +6,9 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -14,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,6 +30,7 @@ import com.example.rktec_middleware.viewmodel.AuthState
 import com.example.rktec_middleware.viewmodel.AuthViewModel
 import com.example.rktec_middleware.viewmodel.MainViewModel
 import com.example.rktec_middleware.viewmodel.RfidViewModel
+import com.example.rktec_middleware.ui.components.ConnectivityStatusIndicator
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -44,9 +49,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mainViewModel: MainViewModel = hiltViewModel()
             val themeOption by mainViewModel.themeOption.collectAsState()
-
+            val connectivityStatus by mainViewModel.connectivityStatus.collectAsState()
 
             RKTecMiddlewareTheme(themeOption = themeOption) {
+                ConnectivityStatusIndicator(status = connectivityStatus)
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
                 val authViewModel: AuthViewModel = hiltViewModel()
@@ -58,6 +64,13 @@ class MainActivity : ComponentActivity() {
                     authViewModel.verificarEstadoAutenticacao()
                 }
 
+                // Configuração de animações
+                val animSpec = tween<IntOffset>(durationMillis = 300)
+                fun enterAnim() = slideInHorizontally(initialOffsetX = { it }, animationSpec = animSpec)
+                fun exitAnim() = slideOutHorizontally(targetOffsetX = { -it }, animationSpec = animSpec)
+                fun popEnterAnim() = slideInHorizontally(initialOffsetX = { -it }, animationSpec = animSpec)
+                fun popExitAnim() = slideOutHorizontally(targetOffsetX = { it }, animationSpec = animSpec)
+
                 when (val state = authState) {
                     is AuthState.Carregando -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -65,35 +78,21 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    is AuthState.AguardandoVerificacao -> {
-                        NavHost(navController = navController, startDestination = Screen.VerificacaoEmail.route) {
-                            composable(Screen.VerificacaoEmail.route) {
-                                TelaVerificacaoEmail(
-                                    email = state.email,
-                                    onVoltarParaLogin = { authViewModel.logout() }
-                                )
-                            }
-                        }
-                    }
-
-                    is AuthState.NaoAutenticado -> {
+                    is AuthState.NaoAutenticado, is AuthState.AguardandoVerificacao, is AuthState.Inativo -> {
                         NavHost(navController = navController, startDestination = Screen.Autenticacao.route) {
                             composable(Screen.Autenticacao.route) {
-                                FluxoAutenticacao(
-                                    aoLoginSucesso = { authViewModel.onLoginSucesso() }
-                                )
-                            }
-                        }
-                    }
-
-                    // ##### NOVO BLOCO ADICIONADO PARA USUÁRIOS INATIVOS #####
-                    is AuthState.Inativo -> {
-                        NavHost(navController = navController, startDestination = Screen.Reativacao.route) {
-                            composable(Screen.Reativacao.route) {
-                                TelaReativacao(
-                                    authViewModel = authViewModel,
-                                    onLogoutClick = { authViewModel.logout() }
-                                )
+                                when (state) {
+                                    is AuthState.NaoAutenticado -> FluxoAutenticacao(aoLoginSucesso = { authViewModel.onLoginSucesso() })
+                                    is AuthState.AguardandoVerificacao -> TelaVerificacaoEmail(
+                                        email = state.email,
+                                        onVoltarParaLogin = { authViewModel.logout() }
+                                    )
+                                    is AuthState.Inativo -> TelaReativacao(
+                                        authViewModel = authViewModel,
+                                        onLogoutClick = { authViewModel.logout() }
+                                    )
+                                    else -> {}
+                                }
                             }
                         }
                     }
@@ -112,13 +111,24 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToProfile = { navController.navigate(Screen.Perfil.route) },
                                     onNavigateToLogAtividades = { navController.navigate(Screen.LogAtividades.route) },
                                     onNavigateToSettings = { navController.navigate(Screen.Configuracoes.route) },
-                                    onLogoutClick = { mostrarDialogLogout = true },
+                                    onLogoutClick = {
+                                        scope.launch { drawerState.close() }
+                                        mostrarDialogLogout = true
+                                    },
                                     onCloseDrawer = { scope.launch { drawerState.close() } }
                                 )
                             }
                         ) {
-                            NavHost(navController = navController, startDestination = startDestination) {
-                                composable(Screen.Principal.route) {
+                            NavHost(
+                                navController = navController,
+                                startDestination = startDestination
+                            ) {
+                                composable(Screen.Principal.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaPrincipal(
                                         authViewModel = authViewModel,
                                         onMenuClick = { scope.launch { drawerState.open() } },
@@ -126,17 +136,20 @@ class MainActivity : ComponentActivity() {
                                         onChecagemClick = { navController.navigate(Screen.Checagem.route) },
                                         onColetaAvulsaClick = { navController.navigate(Screen.ColetaAvulsa.route) },
                                         onSobreClick = { navController.navigate(Screen.Sobre.route) },
+                                        onAjudaClick = { navController.navigate(Screen.Ajuda.route) },
                                         onGerenciarUsuariosClick = { navController.navigate(Screen.GerenciamentoUsuarios.route) },
                                         onHistoricoClick = { navController.navigate(Screen.Historico.route) }
                                     )
                                 }
 
-                                composable(Screen.Importacao.route) {
+                                composable(Screen.Importacao.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaImportacao(
-                                        // ##### MUDANÇA IMPORTANTE AQUI #####
                                         onConcluido = {
-                                            // Ao invés de ir para a tela Principal, agora navegamos para a tela de espera.
-                                            // Não setamos mais o "empresaJaConfigurada", pois o robô fará isso.
                                             navController.navigate(Screen.AguardandoProcessamento.createRoute(usuarioAutenticado.companyId))
                                         },
                                         usuario = usuarioAutenticado,
@@ -144,14 +157,17 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                // ##### NOVA TELA ADICIONADA AO GRAFO #####
-                                composable(route = Screen.AguardandoProcessamento.route, arguments = Screen.AguardandoProcessamento.arguments) { backStackEntry ->
+                                composable(Screen.AguardandoProcessamento.route,
+                                    arguments = Screen.AguardandoProcessamento.arguments,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) { backStackEntry ->
                                     val companyId = backStackEntry.arguments?.getString("companyId") ?: ""
                                     TelaAguardandoProcessamento(
                                         companyId = companyId,
                                         onProcessamentoConcluido = {
-                                            // Quando o processamento termina, vamos para a tela principal
-                                            // e limpamos todo o histórico de navegação de importação/espera.
                                             navController.navigate(Screen.Principal.route) {
                                                 popUpTo(Screen.Importacao.route) { inclusive = true }
                                             }
@@ -159,28 +175,54 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                // --- O restante das suas rotas continua igual ---
-                                composable(Screen.Configuracoes.route) {
+                                composable(Screen.Configuracoes.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaConfiguracoes(
                                         authViewModel = authViewModel,
                                         onVoltar = { navController.popBackStack() }
                                     )
                                 }
 
-                                composable(Screen.LogAtividades.route) {
+                                composable(Screen.LogAtividades.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaLogAtividades(onVoltar = { navController.popBackStack() })
                                 }
 
-                                composable(Screen.Perfil.route) {
+                                composable(Screen.Perfil.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaPerfil(
                                         onVoltar = { navController.popBackStack() },
                                         authViewModel = authViewModel
                                     )
                                 }
-                                composable(Screen.GerenciamentoUsuarios.route) {
+
+                                composable(Screen.GerenciamentoUsuarios.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaGerenciamentoUsuarios(onVoltar = { navController.popBackStack() })
                                 }
-                                composable(Screen.Inventario.route) {
+
+                                composable(Screen.Inventario.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaInventario(
                                         onVoltar = { navController.popBackStack() },
                                         onIniciarLeituraInventario = { loja, setor ->
@@ -189,22 +231,63 @@ class MainActivity : ComponentActivity() {
                                         onSobreClick = { navController.navigate(Screen.Sobre.route) }
                                     )
                                 }
-                                composable(Screen.Checagem.route) {
+
+                                composable(Screen.Checagem.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaChecagem(onVoltar = { navController.popBackStack() })
                                 }
-                                composable(Screen.ColetaAvulsa.route) {
+
+                                composable(Screen.ColetaAvulsa.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaLeituraColeta(viewModel = rfidViewModel, onVoltar = { navController.popBackStack() })
                                 }
-                                composable(Screen.Sobre.route) {
+
+                                composable(Screen.Sobre.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaSobre(onVoltar = { navController.popBackStack() })
                                 }
-                                composable(route = Screen.LeituraInventario.route, arguments = Screen.LeituraInventario.arguments) {
+
+                                composable(Screen.LeituraInventario.route,
+                                    arguments = Screen.LeituraInventario.arguments,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaLeituraInventario(
                                         onVoltar = { navController.popBackStack() },
                                         usuario = usuarioAutenticado
                                     )
                                 }
-                                composable(Screen.Historico.route) {
+
+                                composable(
+                                    Screen.Ajuda.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
+                                    TelaAjuda(onVoltar = { navController.popBackStack() })
+                                }
+
+                                composable(Screen.Historico.route,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaHistorico(
                                         onVoltar = { navController.popBackStack() },
                                         onSessaoClick = { sessaoId ->
@@ -212,31 +295,38 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
-                                composable(route = Screen.DetalheHistorico.route, arguments = Screen.DetalheHistorico.arguments) {
+
+                                composable(Screen.DetalheHistorico.route,
+                                    arguments = Screen.DetalheHistorico.arguments,
+                                    enterTransition = { enterAnim() },
+                                    exitTransition = { exitAnim() },
+                                    popEnterTransition = { popEnterAnim() },
+                                    popExitTransition = { popExitAnim() }
+                                ) {
                                     TelaDetalheHistorico(onVoltar = { navController.popBackStack() })
                                 }
                             }
+                        }
 
-                            if (mostrarDialogLogout) {
-                                AlertDialog(
-                                    onDismissRequest = { mostrarDialogLogout = false },
-                                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
-                                    title = { Text("Confirmar Saída") },
-                                    text = { Text("Tem certeza que deseja sair da sua conta?") },
-                                    confirmButton = {
-                                        Button(
-                                            onClick = {
-                                                authViewModel.logout()
-                                                mostrarDialogLogout = false
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                                        ) { Text("Sair") }
-                                    },
-                                    dismissButton = {
-                                        TextButton(onClick = { mostrarDialogLogout = false }) { Text("Cancelar") }
-                                    }
-                                )
-                            }
+                        if (mostrarDialogLogout) {
+                            AlertDialog(
+                                onDismissRequest = { mostrarDialogLogout = false },
+                                icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+                                title = { Text("Confirmar Saída") },
+                                text = { Text("Tem certeza que deseja sair da sua conta?") },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            authViewModel.logout()
+                                            mostrarDialogLogout = false
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                    ) { Text("Sair") }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { mostrarDialogLogout = false }) { Text("Cancelar") }
+                                }
+                            )
                         }
                     }
                 }

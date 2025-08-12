@@ -58,12 +58,15 @@ class DebugViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val uLogado = usuarioLogado ?: "Desconhecido"
             val itemOriginal = inventarioRepository.buscarPorTag(itemAtualizado.tag, itemAtualizado.companyId)
-            if (itemOriginal == null) return@launch
+            if (itemOriginal == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Erro: Item original não encontrado.", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
 
-            // Registra as edições específicas para o relatório de edições
+            // ----- LÓGICA DE LOGS (INTACTA) -----
             compararEregistrarLogDeEdicao(itemOriginal, itemAtualizado)
-
-            // Registra um log geral para a tela de Log de Atividades
             LogUtil.logAcaoGerenciamentoUsuario(
                 context = context,
                 companyId = itemAtualizado.companyId,
@@ -74,19 +77,30 @@ class DebugViewModel @Inject constructor(
                 detalhes = gerarDetalhesDeEdicao(itemOriginal, itemAtualizado)
             )
 
-            // Salva o item (sua lógica original, intacta)
+            // ----- MUDANÇA PRINCIPAL AQUI -----
+
+            // 1. Salva no banco local PRIMEIRO e de forma independente.
             inventarioRepository.atualizarItem(itemAtualizado)
+
+            // 2. Dá o feedback de sucesso local IMEDIATAMENTE.
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Item salvo localmente!", Toast.LENGTH_SHORT).show()
+            }
+
+            // 3. Tenta sincronizar com a nuvem em segundo plano.
             try {
                 inventarioRepository.atualizarItemNoFirestore(itemAtualizado)
+            } catch (e: Exception) {
+                // Se falhar (ex: offline), informa o usuário de forma clara.
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Item sincronizado!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Falha ao sincronizar. O item será enviado quando houver conexão.", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Exception) { /* ... */ }
+            }
 
+            // 4. Recarrega a lista para a UI refletir a mudança.
             carregarInventario()
         }
     }
-
     private fun gerarDetalhesDeEdicao(original: ItemInventario, novo: ItemInventario): String {
         val detalhes = mutableListOf<String>()
         if (original.desc != novo.desc) detalhes.add("Desc: '${original.desc}' -> '${novo.desc}'")
@@ -124,38 +138,28 @@ class DebugViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val cId = companyId
             val uLogado = usuarioLogado
-            if (cId == null || uLogado == null) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Erro: Informações do usuário não encontradas.", Toast.LENGTH_SHORT).show()
-                }
-                return@launch
-            }
+            if (cId == null || uLogado == null) return@launch
 
             try {
-                // Passo 1: Limpa o inventário de edições em tempo real do Firestore
+                // 1. Limpa o inventário de edições do Firestore
                 inventarioRepository.limparInventarioDoFirestore(cId)
-
-                // Passo 2: Limpa o arquivo JSON principal do Cloud Storage
+                // 2. Limpa o arquivo JSON do Storage
                 inventarioRepository.limparJsonDoStorage(cId)
-
-                // Passo 3: Reseta o status da empresa e apaga o mapeamento no Firestore
+                // 3. Reseta o status da empresa e apaga o mapeamento
                 usuarioRepository.resetarStatusDaEmpresa(cId)
-
-                // Passo 4: Limpa o inventário local do celular (Room)
+                // 4. Limpa o inventário local do celular (Room)
                 inventarioRepository.limparInventarioPorEmpresa(cId)
-
-                // Passo 5: Registra a ação no LogHelper (precisamos passar o companyId)
+                // 5. Registra a ação no Log
                 LogHelper.registrarGerenciamentoUsuario(
                     context = context,
-                    companyId = cId, // Passando o ID da empresa para o log
+                    companyId = cId,
                     usuarioResponsavel = uLogado,
                     acao = "LIMPEZA DE DADOS",
                     usuarioAlvo = "TODA A EMPRESA ($cId)",
                     motivo = "Reset de inventário via Tela de Debug",
-                    detalhes = "Todos os dados de inventário (local e nuvem) foram removidos e o status da empresa foi resetado."
+                    detalhes = "Todos os dados de inventário (local e nuvem) foram removidos."
                 )
 
-                // Passo 6: Recarrega a lista da UI (que agora estará vazia)
                 carregarInventario()
 
                 withContext(Dispatchers.Main) {

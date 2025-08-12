@@ -1,6 +1,7 @@
 package com.example.rktec_middleware.di
 
 import android.app.Application
+import android.content.Context
 import com.example.rktec_middleware.data.db.AppDatabase
 import com.example.rktec_middleware.repository.HistoricoRepository
 import com.example.rktec_middleware.repository.InventarioRepository
@@ -12,6 +13,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import com.example.rktec_middleware.util.ConnectivityObserver
+import com.example.rktec_middleware.util.NetworkConnectivityObserver
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @Module
 @InstallIn(SingletonComponent::class)
