@@ -4,6 +4,7 @@ package com.example.rktec_middleware.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +79,7 @@ fun StandardTextField(
     leadingIcon: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     singleLine: Boolean = true,
     enabled: Boolean = true
 ) {
@@ -90,6 +92,7 @@ fun StandardTextField(
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
         visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
         singleLine = singleLine,
         enabled = enabled,
         colors = OutlinedTextFieldDefaults.colors(

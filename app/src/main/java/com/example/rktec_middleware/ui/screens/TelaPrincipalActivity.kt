@@ -157,7 +157,7 @@ fun TelaPrincipal(
                     )
                 }
             } else {
-                Modifier
+                Modifier.clickable(enabled = true) {}
             }
 
             Box(
